@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '6mb', // Richieste /api/chat con immagini base64
+    },
+  },
   images: {
     remotePatterns: [
       {

@@ -1907,63 +1907,69 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       setInputText("");
 
       try {
-          // Cattura screenshot della webcam/area di lavoro
+          // Cattura screenshot della webcam/area di lavoro in formato data:image/jpeg;base64,...
           let imageBase64: string | null = null;
           
           if (!isCameraPaused && videoRef.current && videoRef.current.readyState >= 2) {
               const vid = videoRef.current;
               const canvas = document.createElement('canvas');
-              
-              // Prova a catturare l'area ROI se disponibile, altrimenti l'intero video
+              const maxDim = 1024; // Limita dimensione per restare sotto il payload limit
+
+              const captureAndEncode = (srcCanvas: HTMLCanvasElement, w: number, h: number): string | null => {
+                  if (w <= 0 || h <= 0) return null;
+                  const scale = Math.min(1, maxDim / Math.max(w, h));
+                  const outW = Math.round(w * scale);
+                  const outH = Math.round(h * scale);
+                  const out = document.createElement('canvas');
+                  out.width = outW;
+                  out.height = outH;
+                  const outCtx = out.getContext('2d');
+                  if (!outCtx) return null;
+                  outCtx.drawImage(srcCanvas, 0, 0, w, h, 0, 0, outW, outH);
+                  const dataUrl = out.toDataURL('image/jpeg', 0.8);
+                  // Non inviare stringhe vuote o malformate
+                  if (!dataUrl || !dataUrl.startsWith('data:image/jpeg;base64,')) return null;
+                  if (dataUrl.length < 100) return null;
+                  return dataUrl;
+              };
+
               if (liveVisionEnabled && roiBounds.w > 0 && roiBounds.h > 0) {
-                  // Cattura solo l'area di lavoro (ROI)
                   const videoWidth = vid.videoWidth || vid.clientWidth || 1920;
                   const videoHeight = vid.videoHeight || vid.clientHeight || 1080;
-                  
-                  // Crea canvas per l'intero video
                   canvas.width = videoWidth;
                   canvas.height = videoHeight;
                   const ctx = canvas.getContext('2d');
-                  
                   if (ctx) {
                       ctx.drawImage(vid, 0, 0, videoWidth, videoHeight);
-                      
-                      // Estrai solo la regione ROI
                       const roiX = Math.floor(roiBounds.x * videoWidth);
                       const roiY = Math.floor(roiBounds.y * videoHeight);
                       const roiW = Math.floor(roiBounds.w * videoWidth);
                       const roiH = Math.floor(roiBounds.h * videoHeight);
-                      
-                      // Crea canvas per ROI
                       const roiCanvas = document.createElement('canvas');
                       roiCanvas.width = roiW;
                       roiCanvas.height = roiH;
                       const roiCtx = roiCanvas.getContext('2d');
-                      
                       if (roiCtx) {
                           roiCtx.drawImage(canvas, roiX, roiY, roiW, roiH, 0, 0, roiW, roiH);
-                          imageBase64 = roiCanvas.toDataURL('image/jpeg', 0.8);
+                          imageBase64 = captureAndEncode(roiCanvas, roiW, roiH);
                       }
                   }
               } else {
-                  // Cattura l'intero video
                   const videoWidth = vid.videoWidth || vid.clientWidth || 1920;
                   const videoHeight = vid.videoHeight || vid.clientHeight || 1080;
-                  
                   if (videoWidth > 0 && videoHeight > 0) {
                       canvas.width = videoWidth;
                       canvas.height = videoHeight;
                       const ctx = canvas.getContext('2d');
-                      
                       if (ctx) {
                           ctx.drawImage(vid, 0, 0, videoWidth, videoHeight);
-                          imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                          imageBase64 = captureAndEncode(canvas, videoWidth, videoHeight);
                       }
                   }
               }
           }
 
-          // Chiama l'API di chat con immagine se disponibile
+          // Invia solo se abbiamo un messaggio e, se c'è immagine, che sia valida
           const response = await fetch('/api/chat', {
               method: 'POST',
               headers: {
@@ -1978,7 +1984,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
 
           if (!response.ok) {
               const errorData = await response.json().catch(() => ({}));
-              throw new Error(errorData.error || 'Errore nella chiamata API');
+              const hint = (errorData as { hint?: string })?.hint;
+              const msg = hint || (errorData as { error?: string })?.error || 'Errore di connessione. Riprova.';
+              throw new Error(msg);
           }
 
           const data = await response.json();
@@ -1989,11 +1997,8 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
           
       } catch (error) {
           console.error('Errore nella chat AI:', error);
-          const errorMessage: ChatMessage = { 
-              sender: 'ai', 
-              text: 'Mi dispiace, si è verificato un errore. Assicurati che OPENAI_API_KEY sia configurata correttamente.' 
-          };
-          setHistory(prev => [...prev, errorMessage]);
+          const text = error instanceof Error ? error.message : 'Errore di connessione. Riprova.';
+          setHistory(prev => [...prev, { sender: 'ai', text }]);
       } finally {
           setIsAnalyzing(false);
       }

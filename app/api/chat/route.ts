@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+function normalizeImageUrl(raw: string): string | null {
+  if (!raw || typeof raw !== 'string') return null;
+  const s = raw.trim();
+  // OpenAI accetta data URL nel formato data:image/<type>;base64,<data>
+  if (s.startsWith('data:image/') && s.includes(';base64,')) return s;
+  // Se è solo base64 senza prefisso, aggiungi il prefisso JPEG
+  if (s.length > 100 && !s.includes('data:')) return `data:image/jpeg;base64,${s}`;
+  return null;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { message, imageBase64, history = [] } = await request.json();
+    const body = await request.json();
+    const { message, imageBase64: rawImage, history = [] } = body;
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
@@ -13,17 +24,21 @@ export async function POST(request: NextRequest) {
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
+      console.error('[Chat API] OPENAI_API_KEY not configured');
       return NextResponse.json(
         { error: 'OPENAI_API_KEY not configured' },
         { status: 500 }
       );
     }
 
+    // Normalizza immagine: deve essere data:image/jpeg;base64,... (o data:image/png;base64,...)
+    const imageBase64 = normalizeImageUrl(rawImage);
+
     // Prepara il contenuto del messaggio utente (testo + immagine se disponibile)
     let userContent: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
-    
-    if (imageBase64 && typeof imageBase64 === 'string') {
-      // Se c'è un'immagine, usa il formato multi-modal
+
+    if (imageBase64) {
+      // Payload con immagine: OpenAI accetta data URL nel campo image_url.url
       userContent = [
         {
           type: 'text',
@@ -32,12 +47,11 @@ export async function POST(request: NextRequest) {
         {
           type: 'image_url',
           image_url: {
-            url: imageBase64 // OpenAI accetta il formato completo data:image/jpeg;base64,...
+            url: imageBase64
           }
         }
       ];
     } else {
-      // Solo testo
       userContent = message;
     }
 
@@ -75,8 +89,16 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('OpenAI API error:', errorData);
-      
+      const errorMessage = (errorData as { error?: { message?: string; code?: string } })?.error?.message;
+      const errorCode = (errorData as { error?: { code?: string } })?.error?.code;
+      console.error('[Chat API] OpenAI error:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorCode: errorCode ?? 'none',
+        errorMessage: errorMessage ?? 'unknown',
+        fullBody: errorData
+      });
+
       // Se gpt-4o-mini non è disponibile, prova con modelli alternativi
       if (response.status === 404 || (errorData.error?.code === 'model_not_found')) {
         // Se c'è un'immagine, prova con gpt-4o o gpt-4-turbo (supportano vision)
@@ -125,9 +147,10 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Chat API error:', error);
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error('[Chat API] Exception:', err.message, err);
     return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Internal server error', details: err.message },
       { status: 500 }
     );
   }
