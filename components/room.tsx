@@ -2739,9 +2739,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                  )}
              </button>
              
-             {/* Pulsante Osservo - JARVIS Style */}
+             {/* Pulsante OSSERVA: usa handleSendMessage (stessa pipeline della chat, con immagine) */}
              <button 
-                 onClick={()=>handleAnalyze("cosa sto osservando?")} 
+                 onClick={() => handleSendMessage("Analizza l'area di lavoro e aiutami.")} 
                  className={`jarvis-primary ${isMobile ? 'h-14 flex-1 px-4' : 'h-20 px-8'} rounded-2xl text-white font-bold flex items-center justify-center gap-3 text-sm sm:text-base relative overflow-hidden group`}
              >
                  <span className="relative z-10 flex items-center gap-3">
