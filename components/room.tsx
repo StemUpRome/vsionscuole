@@ -1465,18 +1465,33 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
             // Prova prima con risoluzione alta, poi fallback
             let stream: MediaStream | null = null;
             try {
+                // Prova prima con risoluzione molto alta
                 stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
                         deviceId: { exact: selectedDeviceId }, 
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 }
+                        width: { ideal: 1920, min: 1280 },
+                        height: { ideal: 1080, min: 720 },
+                        frameRate: { ideal: 30 }
                     } 
                 });
             } catch (e) {
-                console.warn('[Camera] Fallback a risoluzione standard:', e);
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { deviceId: { exact: selectedDeviceId } } 
-                });
+                console.warn('[Camera] Fallback a risoluzione media:', e);
+                try {
+                    // Fallback a risoluzione media
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            deviceId: { exact: selectedDeviceId },
+                            width: { ideal: 1280, min: 640 },
+                            height: { ideal: 720, min: 480 }
+                        } 
+                    });
+                } catch (e2) {
+                    console.warn('[Camera] Fallback a risoluzione base:', e2);
+                    // Ultimo fallback: qualsiasi risoluzione disponibile
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { deviceId: { exact: selectedDeviceId } } 
+                    });
+                }
             }
             
             if (stream && videoRef.current) {
@@ -2225,8 +2240,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                     backfaceVisibility: 'hidden',
                     WebkitTransform: 'translateZ(0)',
                     WebkitBackfaceVisibility: 'hidden',
-                    imageRendering: 'auto',
-                    WebkitImageRendering: 'auto'
+                    WebkitImageRendering: '-webkit-optimize-contrast' // Migliora la nitidezza su WebKit
                 } as React.CSSProperties}
              />
          ) : (
@@ -2327,13 +2341,19 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                      </span>
                  </div>
                  
-                 <div 
-                     ref={workspaceRef}
-                     className="jarvis-workspace absolute inset-0 rounded-3xl transition-all duration-200"
-                     style={{
-                         cursor: roiIsDragging ? 'grabbing' : (activeTool === 'hint' || activeTool === 'area' || activeTool === 'draw' ? 'crosshair' : 'grab'),
-                         pointerEvents: 'auto'
-                     }}
+                <div 
+                    ref={workspaceRef}
+                    className="jarvis-workspace absolute inset-0 rounded-3xl transition-all duration-200"
+                    style={{
+                        cursor: roiIsDragging ? 'grabbing' : (activeTool === 'hint' || activeTool === 'area' || activeTool === 'draw' ? 'crosshair' : 'grab'),
+                        pointerEvents: 'auto',
+                        background: 'transparent',
+                        backdropFilter: 'none',
+                        WebkitBackdropFilter: 'none',
+                        filter: 'none',
+                        mixBlendMode: 'normal',
+                        willChange: 'auto'
+                    } as React.CSSProperties}
                  onMouseDown={(e) => {
                      // Evita drag quando si usano strumenti didattici
                      if (activeTool === 'none' && !roiIsDragging) {
