@@ -1462,14 +1462,24 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
     if (!selectedDeviceId || isCameraPaused) return;
     const startStream = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    deviceId: { exact: selectedDeviceId }, 
-                    width: { ideal: 1920, min: 1280 },
-                    height: { ideal: 1080, min: 720 }
-                } 
-            });
-            if (videoRef.current) {
+            // Prova prima con risoluzione alta, poi fallback
+            let stream: MediaStream | null = null;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        deviceId: { exact: selectedDeviceId }, 
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    } 
+                });
+            } catch (e) {
+                console.warn('[Camera] Fallback a risoluzione standard:', e);
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { deviceId: { exact: selectedDeviceId } } 
+                });
+            }
+            
+            if (stream && videoRef.current) {
                 videoRef.current.srcObject = stream;
                 // Forza il rendering ad alta qualità
                 videoRef.current.setAttribute('playsinline', 'true');
@@ -1488,17 +1498,6 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
             }
         } catch (e) { 
             console.error("Err Stream:", e);
-            // Fallback a constraints più permissive se fallisce
-            try {
-                const fallbackStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { deviceId: { exact: selectedDeviceId } } 
-                });
-                if (videoRef.current) {
-                    videoRef.current.srcObject = fallbackStream;
-                }
-            } catch (e2) {
-                console.error("Fallback stream failed:", e2);
-            }
         }
     };
     startStream();
@@ -2219,13 +2218,14 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                 autoPlay 
                 playsInline 
                 muted 
-                className="absolute inset-0 w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full"
                 style={{
+                    objectFit: 'cover',
                     transform: 'translateZ(0)',
                     backfaceVisibility: 'hidden',
                     WebkitTransform: 'translateZ(0)',
                     WebkitBackfaceVisibility: 'hidden'
-                }}
+                } as React.CSSProperties}
              />
          ) : (
              <div className="text-gray-500 flex flex-col items-center gap-4"><span className="text-6xl">⏸️</span>Camera Pausa</div>
