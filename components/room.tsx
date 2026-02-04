@@ -2755,7 +2755,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                  onClick={(e) => {
                    e.preventDefault();
                    e.stopPropagation();
-                   const msg = "Analizza l'area di lavoro e aiutami.";
+                   const msg = "Leggi il contenuto scritto nell'immagine (numeri, testo, esercizi, formule). Fornisci un feedback educativo preciso: correggi eventuali errori (es. calcoli sbagliati), commenta la risposta e aiuta come faresti se l'utente avesse chiesto dalla chat.";
                    setTimeout(() => handleSendMessage(msg), 0);
                  }}
                  className={`jarvis-primary ${isMobile ? 'h-14 flex-1 px-4' : 'h-20 px-8'} rounded-2xl text-white font-bold flex items-center justify-center gap-3 text-sm sm:text-base relative overflow-hidden group`}

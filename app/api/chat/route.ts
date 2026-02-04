@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     const messages = [
       {
         role: 'system',
-        content: 'Sei un assistente educativo AI per ZenkAI. Aiuti gli studenti con esercizi di matematica, italiano, scienze e altre materie. Rispondi in modo chiaro, educativo e incoraggiante. Se l\'utente chiede di visualizzare strumenti didattici, suggeriscili usando il formato [nome strumento]. Quando ricevi un\'immagine, analizzala attentamente e fornisci feedback educativo basato su ciò che vedi.'
+        content: 'Sei un assistente educativo AI per ZenkAI. Aiuti gli studenti con esercizi di matematica, italiano, scienze e altre materie. Rispondi in modo chiaro, educativo e incoraggiante. Se l\'utente chiede di visualizzare strumenti didattici, suggeriscili usando il formato [nome strumento]. Quando ricevi un\'immagine: prima leggi e analizza il contenuto scritto (numeri, operazioni, testo, esercizi, formule); poi fornisci feedback educativo su quel contenuto (correzioni, spiegazioni, incoraggiamenti). Non limitarti a descrivere gli oggetti sulla scrivania: il focus è sempre sul testo e sui contenuti didattici visibili.'
       },
       // Aggiungi la cronologia della conversazione
       ...history.map((msg: { sender: string; text: string }) => ({
