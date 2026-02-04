@@ -710,8 +710,15 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   const [liveVisionEnabled, setLiveVisionEnabled] = useState(false);
   const [motionDetected, setMotionDetected] = useState(false);
   const [motionIntensity, setMotionIntensity] = useState(0);
+  const [isAutoAnalyzing, setIsAutoAnalyzing] = useState(false); // LED verde quando AI elabora risposta automatica
   
-  // Live Vision Hooks
+  // Auto-analisi: movimento sopra 20% per almeno 3s, poi sotto 5% → trigger
+  const highMotionStartRef = useRef<number | null>(null);
+  const lastAutoAnalysisAtRef = useRef<number>(0);
+  const AUTO_ANALYSIS_COOLDOWN_MS = 30000; // 30s tra un'analisi automatica e l'altra
+  const AUTO_ANALYSIS_MESSAGE = 'Analisi automatica: l\'utente ha completato un\'azione. Verifica la correttezza della scrittura';
+  
+  // Live Vision Hooks (rilevamento movimento già limitato alle coordinate ROI da useMotionDetector)
   const { onMotionDetected: setMotionCallback } = useMotionDetector(videoRef, {
     enabled: liveVisionEnabled && !isCameraPaused,
     threshold: 0.02,
@@ -724,20 +731,8 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
     },
   });
 
-  // Setup motion detection callback
-  useEffect(() => {
-    setMotionCallback((result) => {
-      setMotionDetected(result.hasMotion);
-      setMotionIntensity(result.motionIntensity);
-      
-      if (result.hasMotion) {
-        console.log('[Live Vision] Motion detected:', {
-          intensity: result.motionIntensity,
-          regions: result.motionRegions.length,
-        });
-      }
-    });
-  }, [setMotionCallback]);
+  // Ref per chiamare handleSendMessage dall'auto-trigger (popolato dopo la definizione di handleSendMessage)
+  const handleSendMessageRef = useRef<(msg: string) => Promise<void>>(() => Promise.resolve());
 
   // Stabilization Trigger Hook
   useStabilizationTrigger(
@@ -2004,6 +1999,45 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       }
   };
 
+  // Popola ref per auto-trigger e setup callback movimento (dopo definizione handleSendMessage)
+  useEffect(() => {
+    handleSendMessageRef.current = handleSendMessage;
+  }, [handleSendMessage]);
+
+  useEffect(() => {
+    setMotionCallback((result) => {
+      const intensity = result.motionIntensity;
+      setMotionDetected(result.hasMotion);
+      setMotionIntensity(intensity);
+
+      const now = Date.now();
+      const highStart = highMotionStartRef.current;
+
+      if (intensity >= 0.20) {
+        if (highStart === null) highMotionStartRef.current = now;
+      } else {
+        if (intensity < 0.05) {
+          if (highStart !== null && (now - highStart) >= 3000) {
+            if ((now - lastAutoAnalysisAtRef.current) >= AUTO_ANALYSIS_COOLDOWN_MS && !isAnalyzing) {
+              lastAutoAnalysisAtRef.current = now;
+              highMotionStartRef.current = null;
+              setIsAutoAnalyzing(true);
+              handleSendMessageRef.current(AUTO_ANALYSIS_MESSAGE)?.finally(() => setIsAutoAnalyzing(false));
+            }
+          }
+          highMotionStartRef.current = null;
+        }
+      }
+
+      if (result.hasMotion) {
+        console.log('[Live Vision] Motion detected (ROI):', {
+          intensity: Math.round(intensity * 100) + '%',
+          regions: result.motionRegions.length,
+        });
+      }
+    });
+  }, [setMotionCallback, isAnalyzing]);
+
   const handleAnalyze = async (textInput: string) => {
       if (isAnalyzing) return;
       setIsAnalyzing(true);
@@ -2358,12 +2392,20 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
            />
          </div>
 
-         {/* Motion Indicator */}
-         {liveVisionEnabled && motionDetected && (
-           <div className={`absolute ${isMobile ? 'top-2 right-28' : 'top-6 right-32'} z-50 flex items-center gap-2 px-3 py-1.5 bg-yellow-500/20 border border-yellow-500/50 rounded-lg`}>
-             <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
-             <span className="text-xs text-yellow-400 font-semibold">
-               Movimento ({Math.round(motionIntensity * 100)}%)
+         {/* Motion Indicator: giallo = movimento, verde = AI sta elaborando risposta automatica */}
+         {liveVisionEnabled && (motionDetected || isAutoAnalyzing) && (
+           <div className={`absolute ${isMobile ? 'top-2 right-28' : 'top-6 right-32'} z-50 flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
+             isAutoAnalyzing
+               ? 'bg-green-500/20 border-green-500/50'
+               : 'bg-yellow-500/20 border border-yellow-500/50'
+           }`}>
+             <div className={`w-2 h-2 rounded-full animate-pulse ${
+               isAutoAnalyzing ? 'bg-green-400' : 'bg-yellow-400'
+             }`} />
+             <span className={`text-xs font-semibold ${
+               isAutoAnalyzing ? 'text-green-400' : 'text-yellow-400'
+             }`}>
+               {isAutoAnalyzing ? 'Elaborazione...' : `Movimento (${Math.round(motionIntensity * 100)}%)`}
              </span>
            </div>
          )}

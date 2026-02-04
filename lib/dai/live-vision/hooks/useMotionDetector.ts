@@ -168,7 +168,8 @@ export function useMotionDetector(
     const result = detectMotion(lastFrameRef.current, currentFrame);
     lastFrameRef.current = currentFrame;
 
-    if (result.hasMotion && onMotionDetectedRef.current) {
+    // Always notify so caller can track motionIntensity (e.g. for auto-trigger when it drops)
+    if (onMotionDetectedRef.current) {
       onMotionDetectedRef.current(result);
     }
   }, [enabled, captureFrame, detectMotion]);
