@@ -712,11 +712,14 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   const [motionIntensity, setMotionIntensity] = useState(0);
   const [isAutoAnalyzing, setIsAutoAnalyzing] = useState(false); // LED verde quando AI elabora risposta automatica
   
-  // Auto-analisi: movimento sopra 20% per almeno 3s, poi sotto 5% → trigger
+  // Auto-analisi: movimento > 10% per 2s, poi sotto 3% → trigger
   const highMotionStartRef = useRef<number | null>(null);
   const lastAutoAnalysisAtRef = useRef<number>(0);
   const AUTO_ANALYSIS_COOLDOWN_MS = 30000; // 30s tra un'analisi automatica e l'altra
   const AUTO_ANALYSIS_MESSAGE = 'Analisi automatica: l\'utente ha completato un\'azione. Verifica la correttezza della scrittura';
+  const MOTION_HIGH_THRESHOLD = 0.10;  // 10%
+  const MOTION_LOW_THRESHOLD = 0.03;   // 3%
+  const MOTION_HIGH_DURATION_MS = 2000; // 2 secondi
   
   // Live Vision Hooks (rilevamento movimento già limitato alle coordinate ROI da useMotionDetector)
   const { onMotionDetected: setMotionCallback } = useMotionDetector(videoRef, {
@@ -1907,13 +1910,29 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       setInputText("");
 
       try {
-          // Cattura screenshot della webcam/area di lavoro in formato data:image/jpeg;base64,...
+          // Stessa cattura della manuale: webcam/area di lavoro + ribaltamento orizzontale per leggere il testo
           let imageBase64: string | null = null;
           
           if (!isCameraPaused && videoRef.current && videoRef.current.readyState >= 2) {
               const vid = videoRef.current;
-              const canvas = document.createElement('canvas');
-              const maxDim = 1024; // Limita dimensione per restare sotto il payload limit
+              const videoWidth = vid.videoWidth || vid.clientWidth || 1920;
+              const videoHeight = vid.videoHeight || vid.clientHeight || 1080;
+              const maxDim = 1024;
+
+              const captureFrameWithFlip = (): HTMLCanvasElement | null => {
+                  if (videoWidth <= 0 || videoHeight <= 0) return null;
+                  const canvas = document.createElement('canvas');
+                  canvas.width = videoWidth;
+                  canvas.height = videoHeight;
+                  const ctx = canvas.getContext('2d');
+                  if (!ctx) return null;
+                  ctx.save();
+                  ctx.scale(-1, 1);
+                  ctx.translate(-videoWidth, 0);
+                  ctx.drawImage(vid, 0, 0, videoWidth, videoHeight);
+                  ctx.restore();
+                  return canvas;
+              };
 
               const captureAndEncode = (srcCanvas: HTMLCanvasElement, w: number, h: number): string | null => {
                   if (w <= 0 || h <= 0) return null;
@@ -1927,20 +1946,14 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                   if (!outCtx) return null;
                   outCtx.drawImage(srcCanvas, 0, 0, w, h, 0, 0, outW, outH);
                   const dataUrl = out.toDataURL('image/jpeg', 0.8);
-                  // Non inviare stringhe vuote o malformate
                   if (!dataUrl || !dataUrl.startsWith('data:image/jpeg;base64,')) return null;
                   if (dataUrl.length < 100) return null;
                   return dataUrl;
               };
 
-              if (liveVisionEnabled && roiBounds.w > 0 && roiBounds.h > 0) {
-                  const videoWidth = vid.videoWidth || vid.clientWidth || 1920;
-                  const videoHeight = vid.videoHeight || vid.clientHeight || 1080;
-                  canvas.width = videoWidth;
-                  canvas.height = videoHeight;
-                  const ctx = canvas.getContext('2d');
-                  if (ctx) {
-                      ctx.drawImage(vid, 0, 0, videoWidth, videoHeight);
+              const fullCanvas = captureFrameWithFlip();
+              if (fullCanvas) {
+                  if (liveVisionEnabled && roiBounds.w > 0 && roiBounds.h > 0) {
                       const roiX = Math.floor(roiBounds.x * videoWidth);
                       const roiY = Math.floor(roiBounds.y * videoHeight);
                       const roiW = Math.floor(roiBounds.w * videoWidth);
@@ -1950,21 +1963,11 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                       roiCanvas.height = roiH;
                       const roiCtx = roiCanvas.getContext('2d');
                       if (roiCtx) {
-                          roiCtx.drawImage(canvas, roiX, roiY, roiW, roiH, 0, 0, roiW, roiH);
+                          roiCtx.drawImage(fullCanvas, roiX, roiY, roiW, roiH, 0, 0, roiW, roiH);
                           imageBase64 = captureAndEncode(roiCanvas, roiW, roiH);
                       }
-                  }
-              } else {
-                  const videoWidth = vid.videoWidth || vid.clientWidth || 1920;
-                  const videoHeight = vid.videoHeight || vid.clientHeight || 1080;
-                  if (videoWidth > 0 && videoHeight > 0) {
-                      canvas.width = videoWidth;
-                      canvas.height = videoHeight;
-                      const ctx = canvas.getContext('2d');
-                      if (ctx) {
-                          ctx.drawImage(vid, 0, 0, videoWidth, videoHeight);
-                          imageBase64 = captureAndEncode(canvas, videoWidth, videoHeight);
-                      }
+                  } else {
+                      imageBase64 = captureAndEncode(fullCanvas, videoWidth, videoHeight);
                   }
               }
           }
@@ -2015,14 +2018,16 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       setMotionDetected(result.hasMotion);
       setMotionIntensity(intensity);
 
+      console.log('Intensità movimento:', Math.round(intensity * 100) + '%');
+
       const now = Date.now();
       const highStart = highMotionStartRef.current;
 
-      if (intensity >= 0.20) {
+      if (intensity >= MOTION_HIGH_THRESHOLD) {
         if (highStart === null) highMotionStartRef.current = now;
       } else {
-        if (intensity < 0.05) {
-          if (highStart !== null && (now - highStart) >= 3000) {
+        if (intensity < MOTION_LOW_THRESHOLD) {
+          if (highStart !== null && (now - highStart) >= MOTION_HIGH_DURATION_MS) {
             if ((now - lastAutoAnalysisAtRef.current) >= AUTO_ANALYSIS_COOLDOWN_MS && !isAnalyzing) {
               lastAutoAnalysisAtRef.current = now;
               highMotionStartRef.current = null;
