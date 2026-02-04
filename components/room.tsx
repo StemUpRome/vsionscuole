@@ -1463,10 +1463,43 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
     const startStream = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { deviceId: { exact: selectedDeviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } } 
+                video: { 
+                    deviceId: { exact: selectedDeviceId }, 
+                    width: { ideal: 1920, min: 1280 },
+                    height: { ideal: 1080, min: 720 }
+                } 
             });
-            if (videoRef.current) videoRef.current.srcObject = stream;
-        } catch (e) { console.error("Err Stream:", e); }
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                // Forza il rendering ad alta qualità
+                videoRef.current.setAttribute('playsinline', 'true');
+                videoRef.current.setAttribute('webkit-playsinline', 'true');
+                
+                // Verifica e log della risoluzione effettiva
+                videoRef.current.addEventListener('loadedmetadata', () => {
+                    if (videoRef.current) {
+                        console.log('[Camera] Risoluzione video:', {
+                            width: videoRef.current.videoWidth,
+                            height: videoRef.current.videoHeight,
+                            readyState: videoRef.current.readyState
+                        });
+                    }
+                });
+            }
+        } catch (e) { 
+            console.error("Err Stream:", e);
+            // Fallback a constraints più permissive se fallisce
+            try {
+                const fallbackStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { deviceId: { exact: selectedDeviceId } } 
+                });
+                if (videoRef.current) {
+                    videoRef.current.srcObject = fallbackStream;
+                }
+            } catch (e2) {
+                console.error("Fallback stream failed:", e2);
+            }
+        }
     };
     startStream();
   }, [selectedDeviceId, isCameraPaused]);
@@ -2181,7 +2214,19 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       {/* === COL 2: CENTER (Video & AR) === */}
       <div ref={containerRef} className={`flex-1 relative bg-black flex items-center justify-center overflow-hidden ${isMobile ? 'w-full' : ''}`}>
         {!isCameraPaused ? (
-             <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
+             <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                muted 
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{
+                    transform: 'translateZ(0)',
+                    backfaceVisibility: 'hidden',
+                    WebkitTransform: 'translateZ(0)',
+                    WebkitBackfaceVisibility: 'hidden'
+                }}
+             />
          ) : (
              <div className="text-gray-500 flex flex-col items-center gap-4"><span className="text-6xl">⏸️</span>Camera Pausa</div>
          )}
