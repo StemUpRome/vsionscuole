@@ -1901,6 +1901,109 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   // 7. MOTORE ANALISI (Chiamata al Server)
   // ==========================================
 
+  // Funzione per inviare messaggi alla chat AI (OpenAI)
+  const handleSendMessage = async (message: string) => {
+      if (isAnalyzing || !message.trim()) return;
+      setIsAnalyzing(true);
+      
+      // Aggiungi il messaggio dell'utente alla cronologia
+      const userMessage: ChatMessage = { sender: 'user', text: message.trim() };
+      setHistory(prev => [...prev, userMessage]);
+      setInputText("");
+
+      try {
+          // Cattura screenshot della webcam/area di lavoro
+          let imageBase64: string | null = null;
+          
+          if (!isCameraPaused && videoRef.current && videoRef.current.readyState >= 2) {
+              const vid = videoRef.current;
+              const canvas = document.createElement('canvas');
+              
+              // Prova a catturare l'area ROI se disponibile, altrimenti l'intero video
+              if (liveVisionEnabled && roiBounds.w > 0 && roiBounds.h > 0) {
+                  // Cattura solo l'area di lavoro (ROI)
+                  const videoWidth = vid.videoWidth || vid.clientWidth || 1920;
+                  const videoHeight = vid.videoHeight || vid.clientHeight || 1080;
+                  
+                  // Crea canvas per l'intero video
+                  canvas.width = videoWidth;
+                  canvas.height = videoHeight;
+                  const ctx = canvas.getContext('2d');
+                  
+                  if (ctx) {
+                      ctx.drawImage(vid, 0, 0, videoWidth, videoHeight);
+                      
+                      // Estrai solo la regione ROI
+                      const roiX = Math.floor(roiBounds.x * videoWidth);
+                      const roiY = Math.floor(roiBounds.y * videoHeight);
+                      const roiW = Math.floor(roiBounds.w * videoWidth);
+                      const roiH = Math.floor(roiBounds.h * videoHeight);
+                      
+                      // Crea canvas per ROI
+                      const roiCanvas = document.createElement('canvas');
+                      roiCanvas.width = roiW;
+                      roiCanvas.height = roiH;
+                      const roiCtx = roiCanvas.getContext('2d');
+                      
+                      if (roiCtx) {
+                          roiCtx.drawImage(canvas, roiX, roiY, roiW, roiH, 0, 0, roiW, roiH);
+                          imageBase64 = roiCanvas.toDataURL('image/jpeg', 0.8);
+                      }
+                  }
+              } else {
+                  // Cattura l'intero video
+                  const videoWidth = vid.videoWidth || vid.clientWidth || 1920;
+                  const videoHeight = vid.videoHeight || vid.clientHeight || 1080;
+                  
+                  if (videoWidth > 0 && videoHeight > 0) {
+                      canvas.width = videoWidth;
+                      canvas.height = videoHeight;
+                      const ctx = canvas.getContext('2d');
+                      
+                      if (ctx) {
+                          ctx.drawImage(vid, 0, 0, videoWidth, videoHeight);
+                          imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                      }
+                  }
+              }
+          }
+
+          // Chiama l'API di chat con immagine se disponibile
+          const response = await fetch('/api/chat', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                  message: message.trim(),
+                  imageBase64: imageBase64, // Invia l'immagine se disponibile
+                  history: history // Invia la cronologia per il contesto
+              })
+          });
+
+          if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}));
+              throw new Error(errorData.error || 'Errore nella chiamata API');
+          }
+
+          const data = await response.json();
+          const aiMessage: ChatMessage = { sender: 'ai', text: data.message || 'Nessuna risposta disponibile' };
+          
+          // Aggiungi la risposta AI alla cronologia
+          setHistory(prev => [...prev, aiMessage]);
+          
+      } catch (error) {
+          console.error('Errore nella chat AI:', error);
+          const errorMessage: ChatMessage = { 
+              sender: 'ai', 
+              text: 'Mi dispiace, si è verificato un errore. Assicurati che OPENAI_API_KEY sia configurata correttamente.' 
+          };
+          setHistory(prev => [...prev, errorMessage]);
+      } finally {
+          setIsAnalyzing(false);
+      }
+  };
+
   const handleAnalyze = async (textInput: string) => {
       if (isAnalyzing) return;
       setIsAnalyzing(true);
@@ -2739,7 +2842,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                  <p className={`text-white font-semibold ${isMobile ? 'text-sm' : 'text-md'} leading-tight jarvis-icon-glow`}>{ui.sidebar?.card?.question}</p>
              </div>
 
-             <form onSubmit={(e)=>{e.preventDefault(); handleAnalyze(inputText)}} className="flex gap-2">
+             <form onSubmit={(e)=>{e.preventDefault(); handleSendMessage(inputText)}} className="flex gap-2">
                  <input 
                     value={inputText} 
                     onChange={(e)=>setInputText(e.target.value)} 
