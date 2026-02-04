@@ -2180,8 +2180,8 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
 
       {/* === COL 2: CENTER (Video & AR) === */}
       <div ref={containerRef} className={`flex-1 relative bg-black flex items-center justify-center overflow-hidden ${isMobile ? 'w-full' : ''}`}>
-         {!isCameraPaused ? (
-             <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover opacity-90" />
+        {!isCameraPaused ? (
+             <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
          ) : (
              <div className="text-gray-500 flex flex-col items-center gap-4"><span className="text-6xl">⏸️</span>Camera Pausa</div>
          )}

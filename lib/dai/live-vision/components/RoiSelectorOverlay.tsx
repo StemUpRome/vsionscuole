@@ -162,7 +162,7 @@ export function RoiSelectorOverlay({
     >
       {/* ROI Border */}
       <div
-        className="absolute border-2 border-blue-500 bg-blue-500/10 pointer-events-auto"
+        className="absolute border-2 border-blue-500 bg-transparent pointer-events-auto"
         style={{
           left: `${left}%`,
           top: `${top}%`,
