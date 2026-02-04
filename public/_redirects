@@ -1,0 +1,3 @@
+# Fallback per il routing lato client (SPA): tutte le richieste a path non trovati
+# vengono servite dalla root così il router Next.js può gestire la route.
+/*    /index.html   200

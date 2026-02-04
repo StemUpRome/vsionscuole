@@ -1,0 +1,47 @@
+/* Map.css */
+.react-flow__node-custom {
+    padding: 10px 15px;
+    border-radius: 12px;
+    background: rgba(18, 18, 28, 0.8); /* Vetro scuro */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    text-align: center;
+    font-family: 'Inter', sans-serif;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    width: 180px;
+    transition: all 0.3s ease;
+  }
+  
+  /* Effetto Hover: Il nodo si illumina */
+  .react-flow__node-custom:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.6);
+    border-color: #a5b4fc;
+    cursor: pointer;
+  }
+  
+  /* Titolo del nodo */
+  .node-title {
+    font-weight: bold;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+    display: block;
+  }
+  
+  /* Descrizione piccola */
+  .node-desc {
+    font-size: 0.7rem;
+    opacity: 0.8;
+    line-height: 1.2;
+  }
+  
+  /* Nascondiamo i "pallini" di connessione per un look più pulito in AR */
+  .react-flow__handle {
+    opacity: 0; 
+  }
+  /* Nasconde la firma di React Flow */
+.react-flow__attribution {
+  display: none !important;
+}

@@ -1,0 +1,483 @@
+'use client'
+
+import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts'
+
+const STEPS = 3
+const STEP_NAMES = ['Identity', 'Knowledge', 'Behaviour'] as const
+
+const AVATAR_IMAGES = Array.from({ length: 16 }, (_, i) => `/avatar-${i + 1}.png`)
+const THUMBNAILS = AVATAR_IMAGES.slice(0, 6)
+
+const LANGUAGES = [
+  { value: 'en', label: 'English' },
+  { value: 'it', label: 'Italian' },
+  { value: 'es', label: 'Spanish' },
+  { value: 'fr', label: 'French' },
+  { value: 'de', label: 'German' },
+]
+
+const VOICES = [
+  'English - Female - Warm',
+  'English - Male - Calm',
+  'Italian - Female - Warm',
+  'Italian - Male - Calm',
+  'English - Female - Professional',
+  'English - Male - Professional',
+]
+
+const AI_MODELS = [
+  { value: 'gpt-5', label: 'ChatGPT 5.0' },
+  { value: 'gpt-4', label: 'GPT-4' },
+  { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+  { value: 'claude-3', label: 'Claude 3' },
+]
+
+const TRAITS = [
+  { key: 'openness' as const, label: 'Apertura mentale', color: '#60a5fa' },
+  { key: 'conscientiousness' as const, label: 'Meticolosità', color: '#f87171' },
+  { key: 'extraversion' as const, label: 'Estroversione', color: '#a78bfa' },
+  { key: 'agreeableness' as const, label: 'Amabilità', color: '#4ade80' },
+  { key: 'neuroticism' as const, label: 'Sensibilità', color: '#e5e7eb' },
+]
+
+interface PersonalityState {
+  openness: number
+  conscientiousness: number
+  extraversion: number
+  agreeableness: number
+  neuroticism: number
+}
+
+export default function NewAvatarPage() {
+  const router = useRouter()
+  const [step, setStep] = useState(1)
+
+  const [name, setName] = useState('Irene')
+  const [language, setLanguage] = useState('en')
+  const [voice, setVoice] = useState(VOICES[0])
+  const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_IMAGES[0])
+
+  const [description, setDescription] = useState('')
+  const [descriptionCharLimit] = useState(200)
+  const [knowledgeFiles, setKnowledgeFiles] = useState<Array<{ id: string; name: string }>>([])
+  const [aiModel, setAiModel] = useState('gpt-5')
+
+  const [personality, setPersonality] = useState<PersonalityState>({
+    openness: 30,
+    conscientiousness: 45,
+    extraversion: 60,
+    agreeableness: 65,
+    neuroticism: 25,
+  })
+
+  const radarData = useMemo(
+    () => [
+      { trait: 'Apertura', value: personality.openness, fullMark: 100 },
+      { trait: 'Meticolosità', value: personality.conscientiousness, fullMark: 100 },
+      { trait: 'Estroversione', value: personality.extraversion, fullMark: 100 },
+      { trait: 'Amabilità', value: personality.agreeableness, fullMark: 100 },
+      { trait: 'Sensibilità', value: personality.neuroticism, fullMark: 100 },
+    ],
+    [personality]
+  )
+
+  const handleTraitChange = (key: keyof PersonalityState, value: number) => {
+    setPersonality((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const handleRandomPersonality = () => {
+    setPersonality({
+      openness: Math.round(Math.random() * 100),
+      conscientiousness: Math.round(Math.random() * 100),
+      extraversion: Math.round(Math.random() * 100),
+      agreeableness: Math.round(Math.random() * 100),
+      neuroticism: Math.round(Math.random() * 100),
+    })
+  }
+
+  const addKnowledgeFile = () => {
+    setKnowledgeFiles((prev) => [
+      ...prev,
+      { id: `doc-${Date.now()}`, name: `Documento ${prev.length + 1}` },
+    ])
+  }
+
+  const removeKnowledgeFile = (id: string) => {
+    setKnowledgeFiles((prev) => prev.filter((f) => f.id !== id))
+  }
+
+  const handleCreateAvatar = () => {
+    const newAvatar = {
+      id: `user-${Date.now()}`,
+      name,
+      image: selectedAvatar,
+      languages: [language],
+      voice,
+      description,
+      knowledgeFiles,
+      aiModel,
+      personality,
+      createdAt: new Date().toISOString(),
+    }
+    try {
+      const existing = localStorage.getItem('user_avatars')
+      const avatars = existing ? JSON.parse(existing) : []
+      avatars.push(newAvatar)
+      localStorage.setItem('user_avatars', JSON.stringify(avatars))
+      window.dispatchEvent(new Event('avatar-saved'))
+    } catch (e) {
+      console.error('Error saving avatar:', e)
+    }
+    router.push('/avatars')
+  }
+
+  const goToStep = (s: number) => {
+    if (s >= 1 && s <= STEPS) setStep(s)
+  }
+
+  return (
+    <div className="min-h-screen bg-[#1A1A1A] text-white flex">
+      {/* Left Sidebar */}
+      <aside className="w-64 border-r border-[#2C2C2E] flex flex-col flex-shrink-0">
+        <div className="p-6 border-b border-[#2C2C2E]">
+          <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+            <div className="w-10 h-10 bg-[#6B48FF] rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-xl">Z</span>
+            </div>
+            <span className="text-white font-semibold text-lg">ZenkAI</span>
+          </Link>
+        </div>
+        <nav className="flex-1 p-4 space-y-1">
+          {STEP_NAMES.map((label, i) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => goToStep(i + 1)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all ${
+                step === i + 1
+                  ? 'bg-[#6B48FF] text-white'
+                  : 'text-[#A0A0A0] hover:bg-[#2C2C2E]'
+              }`}
+            >
+              {label === 'Identity' && (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              )}
+              {label === 'Knowledge' && (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+              )}
+              {label === 'Behaviour' && (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              )}
+              <span className="font-medium">{label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="p-4 border-t border-[#2C2C2E]">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 text-[#A0A0A0] hover:text-white text-sm transition-colors"
+          >
+            <span>←</span>
+            <span>Back to Homepage</span>
+          </Link>
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Breadcrumbs + Title */}
+        <div className="p-6 pb-4 border-b border-[#2C2C2E]">
+          <div className="flex items-center gap-2 text-sm mb-2">
+            <Link href="/avatars" className="text-[#6B48FF] hover:underline">
+              Create avatar
+            </Link>
+            <span className="text-[#A0A0A0]">›</span>
+            <span className="text-white">{STEP_NAMES[step - 1]}</span>
+          </div>
+          <h1 className="text-2xl md:text-3xl font-bold text-white">
+            {step === 1 && 'Create your avatar'}
+            {step === 2 && 'Define what your avatar knows'}
+            {step === 3 && 'Define how your avatar behaves'}
+          </h1>
+          <p className="text-[#A0A0A0] mt-1">Step {step} of {STEPS}</p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Step 1 - Identity */}
+          {step === 1 && (
+            <div className="flex flex-col lg:flex-row gap-8 max-w-5xl">
+              <div className="flex flex-col">
+                <div className="aspect-[3/4] max-w-sm rounded-2xl overflow-hidden bg-[#2C2C2E] mb-4">
+                  <img
+                    src={selectedAvatar}
+                    alt="Avatar"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="grid grid-cols-6 gap-2">
+                  {THUMBNAILS.map((src) => (
+                    <button
+                      key={src}
+                      type="button"
+                      onClick={() => setSelectedAvatar(src)}
+                      className={`aspect-square rounded-xl overflow-hidden border-2 transition-colors ${
+                        selectedAvatar === src ? 'border-[#6B48FF]' : 'border-[#2C2C2E] hover:border-[#333335]'
+                      }`}
+                    >
+                      <img src={src} alt="" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex-1 space-y-6 min-w-[280px] sm:min-w-[320px]">
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">Name</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full min-w-0 px-4 py-3 bg-[#2C2C2E] border border-[#2C2C2E] rounded-xl text-white placeholder-[#A0A0A0] focus:outline-none focus:border-[#6B48FF] text-base"
+                    placeholder="Avatar name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">Language</label>
+                  <select
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    className="w-full min-w-[200px] px-4 py-3 pr-10 bg-[#2C2C2E] border border-[#2C2C2E] rounded-xl text-white focus:outline-none focus:border-[#6B48FF] text-base"
+                  >
+                    {LANGUAGES.map((l) => (
+                      <option key={l.value} value={l.value}>{l.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">Voice</label>
+                  <select
+                    value={voice}
+                    onChange={(e) => setVoice(e.target.value)}
+                    className="w-full min-w-[200px] px-4 py-3 pr-10 bg-[#2C2C2E] border border-[#2C2C2E] rounded-xl text-white focus:outline-none focus:border-[#6B48FF] text-base"
+                  >
+                    {VOICES.map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex justify-end pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="px-8 py-3 bg-[#6B48FF] text-white rounded-xl font-medium hover:bg-[#5A3FE6] transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2 - Knowledge */}
+          {step === 2 && (
+            <div className="max-w-2xl space-y-6">
+              <div className="bg-[#2C2C2E] rounded-2xl p-6">
+                <h2 className="text-lg font-semibold text-white mb-2">Description</h2>
+                <div className="relative">
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value.slice(0, descriptionCharLimit))}
+                    placeholder="Describe what this avatar should know and focus on (e.g. Electronics for technical high schools, basic circuits, lab exercises)"
+                    rows={5}
+                    className="w-full px-4 py-3 bg-[#1A1A1A] border border-[#2C2C2E] rounded-xl text-white placeholder-[#A0A0A0] focus:outline-none focus:border-[#6B48FF] resize-none"
+                  />
+                  <span className="absolute top-2 right-2 text-xs text-[#A0A0A0]">
+                    {description.length}/{descriptionCharLimit}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="mt-3 px-4 py-2 bg-[#2C2C2E] border border-[#333335] text-white rounded-xl text-sm font-medium hover:bg-[#333335] transition-colors"
+                >
+                  {description.trim() ? 'Regenerate with AI' : 'Generate with AI'}
+                </button>
+              </div>
+
+              <div className="bg-[#2C2C2E] rounded-2xl p-6">
+                <h2 className="text-lg font-semibold text-white mb-1">Knowledge bank</h2>
+                <p className="text-sm text-[#A0A0A0] mb-4">
+                  These materials are used as references when answering questions.
+                </p>
+                <button
+                  type="button"
+                  onClick={addKnowledgeFile}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#6B48FF] text-white rounded-xl font-medium hover:bg-[#5A3FE6] transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add
+                </button>
+                {knowledgeFiles.length > 0 && (
+                  <ul className="mt-4 space-y-2">
+                    {knowledgeFiles.map((f) => (
+                      <li
+                        key={f.id}
+                        className="flex items-center justify-between px-4 py-3 bg-[#1A1A1A] rounded-xl"
+                      >
+                        <div className="flex items-center gap-3">
+                          <svg className="w-5 h-5 text-[#A0A0A0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span className="text-white">{f.name}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeKnowledgeFile(f.id)}
+                          className="p-2 text-[#A0A0A0] hover:text-white hover:bg-[#333335] rounded-lg transition-colors"
+                          aria-label="Remove"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="bg-[#2C2C2E] rounded-2xl p-6">
+                <h2 className="text-lg font-semibold text-white mb-1">AI Model</h2>
+                <p className="text-sm text-[#A0A0A0] mb-4">
+                  Choose the AI model that best suits your scope
+                </p>
+                <select
+                  value={aiModel}
+                  onChange={(e) => setAiModel(e.target.value)}
+                  className="w-full px-4 py-3 bg-[#1A1A1A] border border-[#2C2C2E] rounded-xl text-white focus:outline-none focus:border-[#6B48FF]"
+                >
+                  {AI_MODELS.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex justify-between pt-4">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="px-8 py-3 bg-[#2C2C2E] text-white rounded-xl font-medium hover:bg-[#333335] transition-colors"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStep(3)}
+                  className="px-8 py-3 bg-[#6B48FF] text-white rounded-xl font-medium hover:bg-[#5A3FE6] transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3 - Behaviour */}
+          {step === 3 && (
+            <div className="max-w-4xl">
+              <div className="flex flex-col lg:flex-row gap-8">
+                <div className="flex-1 space-y-6">
+                  {TRAITS.map(({ key, label, color }) => (
+                    <div key={key}>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium text-white">{label}</span>
+                        <span className="text-xs text-[#A0A0A0]">{personality[key]}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={personality[key]}
+                        onChange={(e) => handleTraitChange(key, parseInt(e.target.value))}
+                        className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                        style={{
+                          background: `linear-gradient(to right, ${color} 0%, ${color} ${personality[key]}%, #2C2C2E ${personality[key]}%, #2C2C2E 100%)`,
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="w-full lg:w-80 flex-shrink-0 flex items-center justify-center">
+                  <div className="w-full h-64 bg-[#2C2C2E] rounded-2xl p-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart data={radarData}>
+                        <PolarGrid stroke="#444" />
+                        <PolarAngleAxis
+                          dataKey="trait"
+                          tick={{ fill: '#e5e5e5', fontSize: 11 }}
+                        />
+                        <PolarRadiusAxis
+                          angle={90}
+                          domain={[0, 100]}
+                          tick={{ fill: '#A0A0A0', fontSize: 10 }}
+                        />
+                        <Radar
+                          name="Behaviour"
+                          dataKey="value"
+                          stroke="#6B48FF"
+                          fill="#6B48FF"
+                          fillOpacity={0.4}
+                          strokeWidth={2}
+                        />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-10 flex items-center justify-between p-6 bg-[#2C2C2E] rounded-2xl">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Random generator</h3>
+                  <p className="text-sm text-[#A0A0A0]">Generate a random personality</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRandomPersonality}
+                  className="w-14 h-14 rounded-full bg-[#6B48FF] text-white flex items-center justify-center hover:bg-[#5A3FE6] transition-colors text-2xl font-bold"
+                  aria-label="Random personality"
+                >
+                  ?
+                </button>
+              </div>
+
+              <div className="flex justify-between mt-8">
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  className="px-8 py-3 bg-[#2C2C2E] text-white rounded-xl font-medium hover:bg-[#333335] transition-colors"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateAvatar}
+                  className="px-8 py-3 bg-[#6B48FF] text-white rounded-xl font-medium hover:bg-[#5A3FE6] transition-colors"
+                >
+                  Create avatar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  )
+}

@@ -1,0 +1,18 @@
+# Configurazione deploy Netlify - ZenkAI (Next.js 14)
+# Usa il plugin ufficiale Next.js per SSR e funzionalità complete.
+# Per un deploy da condividere: nessuna variabile d'ambiente richiesta.
+# (Nhost/API opzionali: vedi ENV_VARIABLES.md)
+#
+# In Netlify UI imposta:
+#   Build command:    npm run build
+#   Publish directory: (lascia VUOTO - lo gestisce il plugin Next.js)
+
+[build]
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--legacy-peer-deps"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
