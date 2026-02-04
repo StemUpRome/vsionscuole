@@ -12,8 +12,19 @@ function normalizeImageUrl(raw: string): string | null {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    let body: { message?: string; imageBase64?: string; history?: unknown[] };
+    try {
+      body = await request.json();
+    } catch (parseErr) {
+      console.error('[Chat API] Invalid JSON or body too large:', parseErr);
+      return NextResponse.json(
+        { error: 'Richiesta non valida o troppo grande (limite corpo richiesta).', hint: 'Prova senza immagine o riduci la dimensione.' },
+        { status: 413 }
+      );
+    }
     const { message, imageBase64: rawImage, history = [] } = body;
+
+    console.log('[Chat API] Request:', { hasImage: !!rawImage, imageLen: typeof rawImage === 'string' ? rawImage.length : 0, msgLen: message?.length, historyCount: Array.isArray(history) ? history.length : 0 });
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(

@@ -4,6 +4,8 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '6mb', // Richieste /api/chat con immagini base64
     },
+    // Limite body per le richieste in ingresso (Route Handlers /api/*)
+    proxyClientMaxBodySize: '6mb',
   },
   images: {
     remotePatterns: [

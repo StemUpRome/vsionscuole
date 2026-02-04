@@ -1972,7 +1972,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
               }
           }
 
-          // Invia solo se abbiamo un messaggio e, se c'è immagine, che sia valida
+          // Limita la cronologia per evitare payload troppo grandi (stesso limite per chat e OSSERVA)
+          const historyToSend = history.slice(-20);
+
           const response = await fetch('/api/chat', {
               method: 'POST',
               headers: {
@@ -1980,27 +1982,35 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
               },
               body: JSON.stringify({
                   message: message.trim(),
-                  imageBase64: imageBase64, // Invia l'immagine se disponibile
-                  history: history // Invia la cronologia per il contesto
+                  imageBase64: imageBase64 ?? null,
+                  history: historyToSend
               })
           });
 
           if (!response.ok) {
-              const errorData = await response.json().catch(() => ({}));
-              const hint = (errorData as { hint?: string })?.hint;
-              const msg = hint || (errorData as { error?: string })?.error || 'Errore di connessione. Riprova.';
-              throw new Error(msg);
+              let errMsg = 'Errore di connessione. Riprova.';
+              try {
+                  const errorData = await response.json();
+                  const hint = (errorData as { hint?: string })?.hint;
+                  const err = (errorData as { error?: string })?.error;
+                  errMsg = hint || err || errMsg;
+              } catch {
+                  const text = await response.text();
+                  if (text) errMsg = `Errore ${response.status}: ${text.slice(0, 200)}`;
+              }
+              throw new Error(errMsg);
           }
 
           const data = await response.json();
           const aiMessage: ChatMessage = { sender: 'ai', text: data.message || 'Nessuna risposta disponibile' };
           
-          // Aggiungi la risposta AI alla cronologia
           setHistory(prev => [...prev, aiMessage]);
           
       } catch (error) {
           console.error('Errore nella chat AI:', error);
-          const text = error instanceof Error ? error.message : 'Errore di connessione. Riprova.';
+          let text = error instanceof Error ? error.message : 'Errore di connessione. Riprova.';
+          if (text.includes('Failed to fetch') || text.includes('Load failed') || text.includes('NetworkError'))
+              text = 'Connessione non riuscita. Controlla la rete o riprova (es. riduci la dimensione dell\'immagine).';
           setHistory(prev => [...prev, { sender: 'ai', text }]);
       } finally {
           setIsAnalyzing(false);
@@ -2739,9 +2749,15 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                  )}
              </button>
              
-             {/* Pulsante OSSERVA: usa handleSendMessage (stessa pipeline della chat, con immagine) */}
-             <button 
-                 onClick={() => handleSendMessage("Analizza l'area di lavoro e aiutami.")} 
+             {/* Pulsante OSSERVA: stessa pipeline della chat (handleSendMessage con messaggio fisso); defer per evitare interferenze dal click */}
+             <button
+                 type="button"
+                 onClick={(e) => {
+                   e.preventDefault();
+                   e.stopPropagation();
+                   const msg = "Analizza l'area di lavoro e aiutami.";
+                   setTimeout(() => handleSendMessage(msg), 0);
+                 }}
                  className={`jarvis-primary ${isMobile ? 'h-14 flex-1 px-4' : 'h-20 px-8'} rounded-2xl text-white font-bold flex items-center justify-center gap-3 text-sm sm:text-base relative overflow-hidden group`}
              >
                  <span className="relative z-10 flex items-center gap-3">
