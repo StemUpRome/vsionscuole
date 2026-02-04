@@ -50,22 +50,43 @@ export default function RoomHomeworkPage() {
     roiBounds,
   })
 
-  // Elenco telecamere
+  // Elenco telecamere + richiesta permessi
   useEffect(() => {
     const loadCameras = async () => {
       try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          console.error('Camera API non disponibile in questo browser / contesto (serve HTTPS).')
+          return
+        }
+
+        // 1. Richiedi permesso alla camera (necessario su molti browser
+        //    per poter poi usare enumerateDevices con deviceId e label)
+        const tempStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        })
+
+        // Chiudi subito lo stream temporaneo: lo riapriremo quando l'utente clicca \"Accendi camera\"
+        tempStream.getTracks().forEach((t) => t.stop())
+
+        // 2. Ora possiamo elencare tutte le telecamere disponibili
         const devices = await navigator.mediaDevices.enumerateDevices()
         const videoInputs = devices
           .filter((d) => d.kind === 'videoinput')
-          .map((d) => ({ deviceId: d.deviceId, label: d.label || `Telecamera ${d.deviceId.slice(0, 8)}` }))
+          .map((d, index) => ({
+            deviceId: d.deviceId,
+            label: d.label || `Telecamera ${index + 1}`,
+          }))
+
         setCameras(videoInputs)
         if (videoInputs.length > 0 && !selectedCameraId) {
           setSelectedCameraId(videoInputs[0].deviceId)
         }
       } catch (e) {
-        console.error('Error listing cameras:', e)
+        console.error('Error listing cameras / requesting permission:', e)
       }
     }
+
     loadCameras()
   }, [])
 
@@ -84,6 +105,12 @@ export default function RoomHomeworkPage() {
       streamRef.current = stream
       if (videoRef.current) {
         videoRef.current.srcObject = stream
+        try {
+          // Alcuni browser richiedono una chiamata esplicita a play()
+          await videoRef.current.play()
+        } catch (err) {
+          console.error('Errore avviando la riproduzione del video:', err)
+        }
       }
       setIsCameraOn(true)
     } catch (e) {
