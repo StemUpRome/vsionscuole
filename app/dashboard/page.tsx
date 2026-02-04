@@ -233,8 +233,8 @@ export default function DashboardPage() {
             <div
               role="button"
               tabIndex={0}
-              onClick={() => router.push('/room/homework')}
-              onKeyDown={(e) => e.key === 'Enter' && router.push('/room/homework')}
+              onClick={() => router.push('/room/legacy')}
+              onKeyDown={(e) => e.key === 'Enter' && router.push('/room/legacy')}
               className="bg-[#2C2C2E] rounded-2xl p-5 sm:p-6 hover:bg-[#333335] transition-colors cursor-pointer min-h-[120px] flex flex-col sm:col-span-2 lg:col-span-1"
             >
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#FFA726] rounded-xl flex items-center justify-center mb-3 sm:mb-4 shrink-0">
