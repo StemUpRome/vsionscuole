@@ -2224,7 +2224,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                     transform: 'translateZ(0)',
                     backfaceVisibility: 'hidden',
                     WebkitTransform: 'translateZ(0)',
-                    WebkitBackfaceVisibility: 'hidden'
+                    WebkitBackfaceVisibility: 'hidden',
+                    imageRendering: 'auto',
+                    WebkitImageRendering: 'auto'
                 } as React.CSSProperties}
              />
          ) : (

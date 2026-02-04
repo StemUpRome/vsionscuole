@@ -264,6 +264,12 @@ export class DAIObservationService {
   private async takeSnapshot(): Promise<void> {
     if (!this.observationState || !this.observationState.isActive) return;
 
+    // Skip se il backend non è configurato per evitare errori continui
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL;
+    if (!apiBase) {
+      return; // Silenziosamente skip se non c'è backend configurato
+    }
+
     // Qui andrebbe chiamata l'API per analizzare l'immagine
     // Per ora simuliamo con un mock
     const newObservables = await this.analyzeCurrentFrame();
@@ -315,7 +321,14 @@ export class DAIObservationService {
 
     try {
       // Chiama l'API del server per analisi OCR
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL;
+      
+      // Se non c'è un backend configurato, salta l'analisi invece di fallire
+      if (!apiBase) {
+        console.debug('[DAI] Backend non configurato, skip analisi frame');
+        return [];
+      }
+      
       const res = await fetch(`${apiBase}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -326,7 +339,10 @@ export class DAIObservationService {
         }),
       });
 
-      if (!res.ok) return [];
+      if (!res.ok) {
+        console.debug('[DAI] API non disponibile, skip analisi');
+        return [];
+      }
 
       const data = await res.json();
       
@@ -373,6 +389,12 @@ export class DAIObservationService {
 
       return observables;
     } catch (error) {
+      // Silenzia gli errori se il backend non è configurato o non disponibile
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL;
+      if (!apiBase || (error instanceof TypeError && error.message.includes('Failed to fetch'))) {
+        // Backend non disponibile - non loggare come errore
+        return [];
+      }
       console.error('[DAI] Error analyzing frame:', error);
       return [];
     }
