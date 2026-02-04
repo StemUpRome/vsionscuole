@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import TimelineComponent from './TimelineComponent';
 import MapComponent from './MapComponent';
 import NumberLineComponent from './NumberLineComponent';
 import GrammarAnalyzerComponent from './GrammarAnalyzerComponent';
 import FractionVisualComponent from './FractionVisualComponent';
-import FlashcardViewerComponent from './FlashcardViewerComponent';
+// TODO: porta anche il FlashcardViewerComponent quando necessario
+const FlashcardViewerComponent = (_props: { rawText: string; sidebarCollapsed?: boolean }) => null;
 import { daiObservationService } from '../services/DAIObservationService';
 import { domainAdapters } from '../services/DAIDomainAdapters';
 import type { ObservationState, TransformationEvent } from '../dai/types';
@@ -197,7 +198,8 @@ const HolographicToolbar = ({
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging) return;
-      const newX = Math.max(0, Math.min(window.innerWidth - 200, e.clientX - dragStartRef.current.x));
+      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1024;
+      const newX = Math.max(0, Math.min(viewportWidth - 200, e.clientX - dragStartRef.current.x));
       const newY = Math.max(0, Math.min(window.innerHeight - 300, e.clientY - dragStartRef.current.y));
       onPositionChange(newX, newY);
     };
@@ -219,7 +221,11 @@ const HolographicToolbar = ({
 
   return (
     <div 
-      className={`toolbar fixed bg-[#18181b]/95 backdrop-blur-md border border-[#6366F1]/30 ${window.innerWidth < 768 ? 'rounded-lg p-1.5' : 'rounded-xl p-2'} flex flex-col gap-1 sm:gap-2 shadow-2xl z-50`}
+      className={`toolbar fixed bg-[#18181b]/95 backdrop-blur-md border border-[#6366F1]/30 ${
+        typeof window !== 'undefined' && window.innerWidth < 768
+          ? 'rounded-lg p-1.5'
+          : 'rounded-xl p-2'
+      } flex flex-col gap-1 sm:gap-2 shadow-2xl z-50`}
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
@@ -592,7 +598,15 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
     }
   };
   export default function Room() {
-    const navigate = useNavigate();
+    const router = useRouter();
+    const navigate = (path: string | number) => {
+      if (typeof path === 'number') {
+        if (path === -1) router.back();
+        else router.push('/dashboard');
+      } else {
+        router.push(path);
+      }
+    };
     const { currentStudent, token } = useAuth();
   // token è disponibile se necessario per future chiamate API
   // ==========================================
@@ -650,10 +664,15 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   const currentDrawPathRef = useRef<DrawPath | null>(null);
   const isDrawingRef = useRef(false);
   const workspaceRef = useRef<HTMLDivElement>(null);
-  const [toolbarPosition, setToolbarPosition] = useState({ x: window.innerWidth - 200, y: 100 });
+  const [toolbarPosition, setToolbarPosition] = useState(() => ({
+    x: typeof window !== 'undefined' ? window.innerWidth - 200 : 0,
+    y: 100,
+  }));
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [supportToolsExpanded, setSupportToolsExpanded] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
   
@@ -1151,8 +1170,13 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
 
       console.log('[Live Vision] Snapshot captured, sending to server for OCR...');
 
-      // Send to server for OCR analysis
-      const response = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:3001'}/api/analyze`, {
+      // Send to server for OCR analysis (Next.js env)
+      const apiBase =
+        process.env.NEXT_PUBLIC_API_BASE ||
+        process.env.NEXT_PUBLIC_API_URL ||
+        'http://localhost:3001'
+
+      const response = await fetch(`${apiBase}/api/analyze`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1301,9 +1325,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   // Rimosso auto-collapse, l'utente può collassare manualmente se vuole 
 
   // Detect mobile e gestisci resize
-  useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth < 768;
+    useEffect(() => {
+      const handleResize = () => {
+        const mobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
       setIsMobile(mobile);
       if (mobile) {
         setLeftSidebarOpen(false);
@@ -1939,7 +1963,12 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
               imageFormat: imgBase64.substring(5, 20) // Mostra il formato (data:image/jpeg...)
           });
 
-          const res = await fetch(`${import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/analyze`, {
+          const apiBase2 =
+            process.env.NEXT_PUBLIC_API_BASE ||
+            process.env.NEXT_PUBLIC_API_URL ||
+            'http://localhost:3001'
+
+          const res = await fetch(`${apiBase2}/api/analyze`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
