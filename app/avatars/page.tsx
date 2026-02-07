@@ -105,6 +105,8 @@ export default function AvatarsPage() {
     { id: 'its', label: 'ITS' },
     { id: 'istituti_professionali', label: 'Istituti Professionali' },
     { id: 'istituti_tecnici', label: 'Istituti tecnici' },
+    { id: 'istituti_comprensivi', label: 'Istituti Comprensivi' },
+    { id: 'scuola_infanzia', label: 'Scuola Infanzia' },
     { id: 'my_creations', label: 'My creations' },
     { id: 'more_filters', label: 'More filters' },
   ]
