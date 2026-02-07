@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import type { Mesh, MeshPhongMaterial } from 'three'
 
 type Object3DType = 'obj' | 'glb' | 'gltf'
 
@@ -62,8 +63,8 @@ export default function RoomObject3D({ objectUrl, objectType, className = '' }: 
           const obj = await loader.loadAsync(objectUrl)
           if (cancelled) return
           obj.traverse((child) => {
-            if ((child as THREE.Mesh).isMesh) {
-              const mat = (child as THREE.Mesh).material as THREE.MeshPhongMaterial
+            if ((child as Mesh).isMesh) {
+              const mat = (child as Mesh).material as MeshPhongMaterial
               if (mat?.color) mat.color.setHex(0x818cf8)
             }
           })
