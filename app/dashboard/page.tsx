@@ -311,13 +311,13 @@ export default function DashboardPage() {
                     >
                       <p className="text-white font-medium text-xs sm:text-sm truncate">{avatar.name || `Avatar ${index + 1}`}</p>
                       <div className="flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); router.push(`/avatars/${avatar.id}`); }}
-                          className="px-2 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[10px] font-semibold border border-white/30"
+                        <Link
+                          href={`/avatars/${encodeURIComponent(avatar.id)}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="px-2 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[10px] font-semibold border border-white/30 no-underline inline-block"
                         >
                           Modifica
-                        </button>
+                        </Link>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); deleteAvatar(avatar.id); }}
