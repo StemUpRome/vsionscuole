@@ -5,7 +5,6 @@
 
 import { ConvaiClient } from 'convai-web-sdk';
 import type { ConvaiClientParams } from 'convai-web-sdk';
-import { getConvaiApiKeyFromEnv } from './config';
 
 const TOKEN_URL = '/api/convai/token';
 
@@ -13,18 +12,24 @@ export interface ConvaiTokenResponse {
   apiKey: string;
 }
 
+function trimKey(value: string | undefined): string | undefined {
+  if (value == null || value === '') return undefined;
+  const t = String(value).trim();
+  if (!t || t === 'tuo_codice') return undefined;
+  return t;
+}
+
 /**
- * Recupera l'API key Convai: NEXT_PUBLIC_CONVAI_API_KEY, poi CONVAI_API_KEY, infine /api/convai/token.
+ * Recupera l'API key Convai nell'ordine: NEXT_PUBLIC_CONVAI_API_KEY, poi CONVAI_API_KEY, infine /api/convai/token.
  */
 export async function getConvaiApiKey(): Promise<string> {
-  console.log('Valore recuperato:', process.env.NEXT_PUBLIC_CONVAI_API_KEY);
+  const withPrefix = trimKey(process.env.NEXT_PUBLIC_CONVAI_API_KEY);
+  const withoutPrefix = trimKey(process.env.CONVAI_API_KEY);
 
-  let envKey = getConvaiApiKeyFromEnv();
-  if (!envKey && typeof process !== 'undefined' && process.env.CONVAI_API_KEY) {
-    const fallback = String(process.env.CONVAI_API_KEY).trim();
-    if (fallback && fallback !== 'tuo_codice') envKey = fallback;
-  }
+  const envKey = withPrefix ?? withoutPrefix;
   if (envKey) return envKey;
+
+  console.error('ERRORE CRITICO: Nessuna chiave trovata con o senza prefisso NEXT_PUBLIC');
 
   const res = await fetch(TOKEN_URL);
   if (!res.ok) {
