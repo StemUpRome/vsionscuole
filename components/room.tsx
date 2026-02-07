@@ -628,6 +628,13 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   const [convaiReady, setConvaiReady] = useState(false);
   const [convaiError, setConvaiError] = useState<string | null>(null);
 
+  // Modalità ingresso: Visual (webcam full) vs Avatar (avatar al centro, webcam PiP)
+  const hasAvatarMode = Boolean(avatarIdProp);
+  const [avatarDisplayData, setAvatarDisplayData] = useState<{ image: string; name: string } | null>(null);
+  const [avatarPosition, setAvatarPosition] = useState({ xPercent: 82, yPercent: 22 });
+  const avatarDragRef = useRef<{ isDragging: boolean; startX: number; startY: number; startXPercent: number; startYPercent: number }>({ isDragging: false, startX: 0, startY: 0, startXPercent: 0, startYPercent: 0 });
+  const avatarSize = { w: 240, h: 320 };
+
   // ==========================================
   // 4. STATI APPLICAZIONE
   // ==========================================
@@ -686,20 +693,29 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   // Determina se c'è un tool AR attivo
   const hasActiveTool = ui.ar_overlay?.tool_active && ui.ar_overlay.tool_active !== 'none';
 
-  // Convai: risolvi characterId da avatarId (localStorage) e inizializza client
+  // Convai + dati avatar per modalità Avatar: risolvi da avatarId (localStorage)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     let characterId: string | null = null;
+    let displayData: { image: string; name: string } | null = null;
     try {
       const raw = localStorage.getItem('user_avatars');
       const avatars = raw ? JSON.parse(raw) : [];
       if (avatarIdProp) {
         const avatar = avatars.find((a: { id?: string }) => a.id === avatarIdProp);
         characterId = avatar?.convaiCharacterId ?? null;
+        if (avatar) {
+          displayData = {
+            image: avatar.image || '/avatar-1.png',
+            name: avatar.name || 'Avatar',
+          };
+        }
       } else if (avatars.length > 0) {
         const withConvai = avatars.find((a: { convaiCharacterId?: string }) => a.convaiCharacterId);
         characterId = withConvai?.convaiCharacterId ?? null;
       }
+      if (avatarIdProp && displayData) setAvatarDisplayData(displayData);
+      if (!avatarIdProp) setAvatarDisplayData(null);
     } catch {
       characterId = null;
     }
@@ -2323,6 +2339,51 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       }
   };
 
+  // Drag avatar (solo in modalità Avatar): clamp per non coprire dock/controlli
+  const handleAvatarDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (!hasAvatarMode) return;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    avatarDragRef.current = {
+      isDragging: true,
+      startX: clientX,
+      startY: clientY,
+      startXPercent: avatarPosition.xPercent,
+      startYPercent: avatarPosition.yPercent,
+    };
+  }, [hasAvatarMode, avatarPosition.xPercent, avatarPosition.yPercent]);
+
+  const handleAvatarDragMove = useCallback((e: MouseEvent | TouchEvent) => {
+    if (!avatarDragRef.current.isDragging) return;
+    const clientX = 'touches' in e ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX;
+    const clientY = 'touches' in e ? (e as TouchEvent).touches[0].clientY : (e as MouseEvent).clientY;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const dx = ((clientX - avatarDragRef.current.startX) / rect.width) * 100;
+    const dy = ((clientY - avatarDragRef.current.startY) / rect.height) * 100;
+    const xPercent = Math.max(5, Math.min(95, avatarDragRef.current.startXPercent + dx));
+    const yPercent = Math.max(5, Math.min(72, avatarDragRef.current.startYPercent + dy));
+    setAvatarPosition({ xPercent, yPercent });
+  }, []);
+
+  const handleAvatarDragEnd = useCallback(() => {
+    avatarDragRef.current.isDragging = false;
+  }, []);
+
+  useEffect(() => {
+    if (!hasAvatarMode) return;
+    window.addEventListener('mousemove', handleAvatarDragMove);
+    window.addEventListener('mouseup', handleAvatarDragEnd);
+    window.addEventListener('touchmove', handleAvatarDragMove, { passive: true });
+    window.addEventListener('touchend', handleAvatarDragEnd);
+    return () => {
+      window.removeEventListener('mousemove', handleAvatarDragMove);
+      window.removeEventListener('mouseup', handleAvatarDragEnd);
+      window.removeEventListener('touchmove', handleAvatarDragMove);
+      window.removeEventListener('touchend', handleAvatarDragEnd);
+    };
+  }, [hasAvatarMode, handleAvatarDragMove, handleAvatarDragEnd]);
+
   // ==========================================
   // 8. RENDER UI (Layout 3 Colonne Completo)
   // ==========================================
@@ -2459,6 +2520,62 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
 
       {/* === COL 2: CENTER (Video & AR) === */}
       <div ref={containerRef} className={`flex-1 relative bg-black flex items-center justify-center overflow-hidden ${isMobile ? 'w-full' : ''}`}>
+        {hasAvatarMode ? (
+          /* ---------- MODALITÀ AVATAR: avatar al centro (draggable), webcam PiP ---------- */
+          <>
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0f0f12] to-[#18181b]" />
+            {/* PiP Webcam - angolo in alto a destra, circolare */}
+            <div className="absolute top-4 right-4 z-30 w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-2 border-[#6366F1]/50 shadow-[0_0_20px_rgba(99,102,241,0.4)] ring-2 ring-black/30">
+              {!isCameraPaused ? (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover"
+                  style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' } as React.CSSProperties}
+                />
+              ) : (
+                <div className="w-full h-full bg-[#2C2C2E] flex items-center justify-center text-gray-500 text-2xl">⏸</div>
+              )}
+            </div>
+            {/* Avatar draggabile - posizione iniziale in alto a destra, trascinabile ovunque (senza coprire dock) */}
+            {avatarDisplayData && (
+              <div
+                role="presentation"
+                className="absolute z-20 cursor-grab active:cursor-grabbing rounded-2xl overflow-hidden border-2 border-transparent hover:border-[#6366F1]/60 hover:shadow-[0_0_30px_rgba(99,102,241,0.4)] transition-all duration-200 select-none touch-none"
+                style={{
+                  left: `${avatarPosition.xPercent}%`,
+                  top: `${avatarPosition.yPercent}%`,
+                  transform: 'translate(-50%, -50%)',
+                  width: avatarSize.w,
+                  height: avatarSize.h,
+                }}
+                onMouseDown={handleAvatarDragStart}
+                onTouchStart={handleAvatarDragStart}
+              >
+                <img
+                  src={avatarDisplayData.image}
+                  alt={avatarDisplayData.name}
+                  className="w-full h-full object-cover pointer-events-none"
+                  draggable={false}
+                />
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent py-2 px-3">
+                  <p className="text-white text-sm font-semibold truncate">{avatarDisplayData.name}</p>
+                  {convaiReady && (isAiSpeaking || isListening) && (
+                    <div className="flex gap-0.5 h-3 mt-1 items-end">
+                      <div className="w-1 bg-[#818CF8] rounded-full animate-pulse" style={{ height: audioLevels[0] ? `${Math.min(12, audioLevels[0] / 4)}px` : 4 }} />
+                      <div className="w-1 bg-[#818CF8] rounded-full animate-pulse" style={{ height: audioLevels[1] ? `${Math.min(14, audioLevels[1] / 3)}px` : 6 }} />
+                      <div className="w-1 bg-[#818CF8] rounded-full animate-pulse" style={{ height: audioLevels[2] ? `${Math.min(12, audioLevels[2] / 4)}px` : 4 }} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          /* ---------- MODALITÀ VISUAL: webcam a tutto schermo, ROI, D.A.I ---------- */
+          <>
         {!isCameraPaused ? (
              <video 
                 ref={videoRef} 
@@ -2478,6 +2595,8 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
          ) : (
              <div className="text-gray-500 flex flex-col items-center gap-4"><span className="text-6xl">⏸️</span>Camera Pausa</div>
          )}
+          </>
+        )}
 
          {/* Live Vision Toggle */}
          <div className={`absolute ${isMobile ? 'top-2 right-2' : 'top-6 right-6'} z-50`}>
@@ -2505,8 +2624,8 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
            </div>
          )}
 
-         {/* ROI Selector Overlay */}
-         {liveVisionEnabled && (
+         {/* ROI Selector Overlay - solo in modalità Visual */}
+         {!hasAvatarMode && liveVisionEnabled && (
            <RoiSelectorOverlay
              bounds={{
                x: roiBounds.x,
@@ -2551,7 +2670,8 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
              </button>
          </div>
 
-         {/* Toolbar Fluttuante (fuori dal ROI) */}
+         {/* Toolbar Fluttuante - solo in modalità Visual */}
+         {!hasAvatarMode && (
          <HolographicToolbar
              activeTool={activeTool}
              onToolChange={setActiveTool}
@@ -2562,10 +2682,10 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
              position={toolbarPosition}
              onPositionChange={(x, y) => setToolbarPosition({ x, y })}
          />
+         )}
 
-
-         {/* AR: WORKSPACE (Box Blu Interattivo - JARVIS Style) */}
-         {ui.ar_overlay?.show_workspace && (
+         {/* AR: WORKSPACE (Box Blu Interattivo - JARVIS Style) - solo Visual */}
+         {!hasAvatarMode && ui.ar_overlay?.show_workspace && (
              <div className="absolute z-10" style={{
                  left: `${roiBounds.x * 100}%`,
                  top: `${roiBounds.y * 100}%`,
