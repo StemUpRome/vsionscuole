@@ -3306,42 +3306,40 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
 
       {/* MODAL SETTINGS */}
       {isSettingsOpen && (
-        <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-6 backdrop-blur-sm">
-            <div className="bg-[#1E1F20] p-6 rounded-2xl w-full max-w-sm border border-gray-700 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-6 backdrop-blur-sm overflow-y-auto">
+            <div className="bg-[#1E1F20] p-6 rounded-2xl w-full max-w-sm border border-gray-700 shadow-2xl my-auto">
                 <h3 className="font-bold mb-4 text-white">Impostazioni</h3>
 
-                {/* Sfondo Room: upload immagine (al posto della camera) */}
-                <div className="mb-6 pb-6 border-b border-gray-700">
-                    <div className="text-sm font-medium text-white mb-2">Sfondo Room</div>
-                    <p className="text-xs text-gray-400 mb-3">Carica un&apos;immagine: l&apos;avatar vedrà questo sfondo al posto della camera.</p>
-                    <div className="flex flex-col gap-2">
-                        <label className="flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-[#6366F1]/20 border border-[#6366F1]/50 text-[#818CF8] hover:bg-[#6366F1]/30 cursor-pointer transition-colors text-sm font-medium">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                            Carica immagine sfondo
-                            <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (!file?.type.startsWith('image/')) return;
-                                    const reader = new FileReader();
-                                    reader.onload = () => setCustomBackgroundImage(reader.result as string);
-                                    reader.readAsDataURL(file);
-                                    e.target.value = '';
-                                }}
-                            />
-                        </label>
-                        {customBackgroundImage && (
-                            <button
-                                type="button"
-                                onClick={() => setCustomBackgroundImage(null)}
-                                className="py-2 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-gray-300 text-sm font-medium transition"
-                            >
-                                Rimuovi sfondo (usa camera)
-                            </button>
-                        )}
-                    </div>
+                {/* Sfondo Room: PRIMO BLOCCO in evidenza */}
+                <div className="mb-6 pb-6 border-b border-gray-700 rounded-xl bg-[#6366F1]/10 border border-[#6366F1]/30 p-4 -mx-1">
+                    <div className="text-sm font-bold text-[#818CF8] mb-1">🖼️ Sfondo Room</div>
+                    <p className="text-xs text-gray-400 mb-3">L&apos;avatar vedrà questa immagine al posto della camera.</p>
+                    <label className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#6366F1] hover:bg-[#5A3FE6] text-white cursor-pointer transition-colors text-sm font-semibold border-2 border-[#6366F1]">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        Carica immagine sfondo
+                        <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file?.type.startsWith('image/')) return;
+                                const reader = new FileReader();
+                                reader.onload = () => setCustomBackgroundImage(reader.result as string);
+                                reader.readAsDataURL(file);
+                                e.target.value = '';
+                            }}
+                        />
+                    </label>
+                    {customBackgroundImage && (
+                        <button
+                            type="button"
+                            onClick={() => setCustomBackgroundImage(null)}
+                            className="mt-2 w-full py-2 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-gray-300 text-sm font-medium transition"
+                        >
+                            Rimuovi sfondo (usa camera)
+                        </button>
+                    )}
                 </div>
                 
                 {/* ROI Snap Toggle */}
