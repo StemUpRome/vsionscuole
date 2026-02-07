@@ -301,32 +301,38 @@ export default function DashboardPage() {
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      <div className="p-3 sm:p-4">
-                        <p className="text-white font-medium text-xs sm:text-sm truncate">{avatar.name || `Avatar ${index + 1}`}</p>
-                      </div>
                     </div>
-                    <div className="absolute bottom-2 left-2 right-2 flex flex-wrap items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); router.push(`/avatars/${avatar.id}`); }}
-                        className="px-2 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[10px] font-semibold border border-white/30"
-                      >
-                        Modifica
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); deleteAvatar(avatar.id); }}
-                        className="px-2 py-1 rounded-lg bg-red-500/80 hover:bg-red-500 text-white text-[10px] font-semibold"
-                      >
-                        Elimina
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); router.push(`/room/legacy?avatarId=${encodeURIComponent(avatar.id)}`); }}
-                        className="ml-auto px-2 py-1 rounded-lg bg-[#6B48FF] text-white text-[10px] font-semibold hover:bg-[#5A3FE6]"
-                      >
-                        Room
-                      </button>
+                    <div
+                      className="p-3 sm:p-3 flex flex-col gap-2"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => router.push(`/avatars/${avatar.id || index}`)}
+                      onKeyDown={(e) => e.key === 'Enter' && router.push(`/avatars/${avatar.id || index}`)}
+                    >
+                      <p className="text-white font-medium text-xs sm:text-sm truncate">{avatar.name || `Avatar ${index + 1}`}</p>
+                      <div className="flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); router.push(`/avatars/${avatar.id}`); }}
+                          className="px-2 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[10px] font-semibold border border-white/30"
+                        >
+                          Modifica
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); deleteAvatar(avatar.id); }}
+                          className="px-2 py-1 rounded-lg bg-red-500/80 hover:bg-red-500 text-white text-[10px] font-semibold"
+                        >
+                          Elimina
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); router.push(`/room/legacy?avatarId=${encodeURIComponent(avatar.id)}`); }}
+                          className="ml-auto px-2 py-1 rounded-lg bg-[#6B48FF] text-white text-[10px] font-semibold hover:bg-[#5A3FE6]"
+                        >
+                          Room
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))
