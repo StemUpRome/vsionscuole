@@ -716,7 +716,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
     }
   }, [avatarIdProp]);
 
-  // Convai: inizializza client quando c'è characterId (da avatarId o primo avatar con Convai)
+  // Convai: inizializza con convaiCharacterId dell'avatar passato dall'URL (avatarId) così l'identità è quella dell'avatar (es. Regus)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     let characterId: string | null = null;
@@ -2005,7 +2005,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       setInputText("");
 
       try {
-          // Stessa cattura della manuale: webcam/area di lavoro + ribaltamento orizzontale per leggere il testo
+          // Cattura dalla webcam principale (videoRef = stesso stream in Visual e in Avatar; in Avatar è full-screen con blur ma videoWidth/videoHeight restano a risoluzione piena per OSSERVA)
           let imageBase64: string | null = null;
           
           if (!isCameraPaused && videoRef.current && videoRef.current.readyState >= 2) {
@@ -2106,6 +2106,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
           if (convaiClientRef.current) {
             try { convaiClientRef.current.sendTextStream(aiText); } catch (e) { console.warn('[Convai] sendTextStream:', e); }
           }
+          // Convai è inizializzato con convaiCharacterId dell'avatar (da URL avatarId) in useEffect; sendTextStream fa parlare l'avatar con la risposta
           
       } catch (error) {
           console.error('Errore nella chat AI:', error);
@@ -2534,7 +2535,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
 
       {/* === COL 2: CENTER (Video & AR) === */}
       <div ref={containerRef} className={`flex-1 relative bg-black flex items-center justify-center overflow-hidden min-h-0 ${isMobile ? 'w-full' : ''}`}>
-        {/* Un solo <video> sempre montato: posizionato full-screen (Visual) o in PiP (Avatar) così lo stream resta collegato */}
+        {/* Un solo <video> sempre montato: in Visual full-screen; in Avatar full-screen con blur come sfondo (stesso ref = cattura OSSERVA a risoluzione piena) */}
         {!isCameraPaused ? (
           <video
             ref={videoRef}
@@ -2543,20 +2544,17 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
             muted
             className="absolute w-full h-full object-cover"
             style={{
-              ...(hasAvatarMode
-                ? { top: 16, right: 16, left: 'auto', bottom: 'auto', width: 128, height: 128, borderRadius: '9999px', zIndex: 30 }
-                : { inset: 0 }),
-              transform: 'translateZ(0)',
+              ...(hasAvatarMode ? { inset: 0, zIndex: 0, filter: 'blur(14px)' } : { inset: 0 }),
+              transform: hasAvatarMode ? 'translateZ(0) scale(1.08)' : 'translateZ(0)',
               backfaceVisibility: 'hidden',
-              WebkitTransform: 'translateZ(0)',
+              WebkitTransform: hasAvatarMode ? 'translateZ(0) scale(1.08)' : 'translateZ(0)',
               WebkitBackfaceVisibility: 'hidden',
               imageRendering: 'auto',
             } as React.CSSProperties}
           />
         ) : (
           <div
-            className={`text-gray-500 flex flex-col items-center justify-center gap-4 ${hasAvatarMode ? 'absolute top-4 right-4 z-30 w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-[#2C2C2E]' : 'absolute inset-0'}`}
-            style={hasAvatarMode ? {} : undefined}
+            className={`text-gray-500 flex flex-col items-center justify-center gap-4 ${hasAvatarMode ? 'absolute inset-0 z-0 bg-[#18181b]' : 'absolute inset-0'}`}
           >
             <span className="text-6xl">⏸️</span>
             {!hasAvatarMode && <span>Camera Pausa</span>}
@@ -2564,13 +2562,12 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
         )}
 
         {hasAvatarMode ? (
-          /* ---------- MODALITÀ AVATAR: sfondo + PiP già sopra, avatar draggabile ---------- */
+          /* ---------- MODALITÀ AVATAR: webcam full-screen sfocata come sfondo, overlay scuro, avatar in primo piano ---------- */
           <>
-            <div className="absolute inset-0 bg-gradient-to-b from-[#0f0f12] to-[#18181b] pointer-events-none" style={{ zIndex: 10 }} />
-            {/* Cornice PiP (solo quando camera attiva, il video è già sopra) */}
             {!isCameraPaused && (
-              <div className="absolute top-4 right-4 z-30 w-28 h-28 sm:w-32 sm:h-32 rounded-full border-2 border-[#6366F1]/50 shadow-[0_0_20px_rgba(99,102,241,0.4)] ring-2 ring-black/30 pointer-events-none" />
+              <div className="absolute inset-0 bg-black/55 pointer-events-none" style={{ zIndex: 5 }} />
             )}
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0f0f12]/80 to-[#18181b]/90 pointer-events-none" style={{ zIndex: 10 }} />
             {/* Avatar draggabile - Image-to-Live: pulse da audio, glow viola, effetto bocca */}
             {avatarDisplayData && (() => {
               const isSpeaking = isAiSpeaking || isListening;
@@ -3046,7 +3043,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
              {(!sidebarCollapsed || isMobile) ? (
                  <div className="relative flex items-center gap-2">
                      <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-[#6366F1] rounded-full animate-pulse"></div>
-                     <h2 className={`font-bold bg-gradient-to-r from-[#6366F1] to-[#818CF8] bg-clip-text text-transparent ${isMobile ? 'text-base' : 'text-lg'} jarvis-icon-glow`}>D.A.I</h2>
+                     <h2 className={`font-bold bg-gradient-to-r from-[#6366F1] to-[#818CF8] bg-clip-text text-transparent ${isMobile ? 'text-base' : 'text-lg'} jarvis-icon-glow`}>
+                       {hasAvatarMode && avatarDisplayData ? avatarDisplayData.name : 'D.A.I'}
+                     </h2>
                  </div>
              ) : (
                  <div className="text-2xl bg-gradient-to-r from-[#6366F1] to-[#818CF8] bg-clip-text text-transparent jarvis-icon-glow">💬</div>
@@ -3088,6 +3087,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                 return (
                     <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
                         <div className={`max-w-[90%] ${msg.sender === 'user' ? '' : 'w-full'} relative`}>
+                            {msg.sender === 'ai' && hasAvatarMode && avatarDisplayData && (
+                              <p className="text-[10px] font-semibold text-[#818CF8] mb-1 pl-1">{avatarDisplayData.name}</p>
+                            )}
                             {/* JARVIS Style Chat Bubble */}
                             <div className={`p-4 rounded-xl text-sm leading-relaxed relative ${
                                 msg.sender === 'user' 
