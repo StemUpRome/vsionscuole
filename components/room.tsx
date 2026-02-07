@@ -3419,11 +3419,10 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                     )}
                 </div>
 
-                {/* Oggetto 3D (OBJ/GLB): l'avatar può "vederlo" nella room */}
-                {hasAvatarMode && (
+                {/* Oggetto 3D (OBJ/GLB): visibile in Impostazioni sempre; in room solo in modalità avatar */}
                 <div className="mb-6 pb-6 border-b border-gray-700 rounded-xl bg-[#6366F1]/10 border border-[#6366F1]/30 p-4 -mx-1">
                     <div className="text-sm font-bold text-[#818CF8] mb-1">📦 Oggetto 3D</div>
-                    <p className="text-xs text-gray-400 mb-3">Carica un modello OBJ o GLB: apparirà nella room e l&apos;avatar potrà vederlo.</p>
+                    <p className="text-xs text-gray-400 mb-3">Carica un modello OBJ o GLB: in modalità avatar apparirà nella room (trascinabile) e l&apos;avatar potrà vederlo.</p>
                     <label className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#5A3FE6]/80 hover:bg-[#5A3FE6] text-white cursor-pointer transition-colors text-sm font-semibold border border-[#6366F1]/50">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8 4-8-4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
                         Carica OBJ / GLB
@@ -3461,7 +3460,6 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                         </button>
                     )}
                 </div>
-                )}
                 
                 {/* ROI Snap Toggle */}
                 <div className="mb-6 pb-6 border-b border-gray-700">
