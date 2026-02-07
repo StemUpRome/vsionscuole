@@ -285,17 +285,15 @@ export default function DashboardPage() {
                         <p className="text-white font-medium text-xs sm:text-sm truncate">{avatar.name || `Avatar ${index + 1}`}</p>
                       </div>
                     </div>
-                    {avatar.convaiCharacterId && (
-                      <div className="absolute bottom-2 right-2">
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); router.push(`/room/legacy?avatarId=${encodeURIComponent(avatar.id || index)}`); }}
-                          className="px-2 py-1 rounded-lg bg-[#6B48FF] text-white text-[10px] font-semibold hover:bg-[#5A3FE6]"
-                        >
-                          Room
-                        </button>
-                      </div>
-                    )}
+                    <div className="absolute bottom-2 right-2">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); router.push(`/room/legacy?avatarId=${encodeURIComponent(avatar.id || index)}`); }}
+                        className="px-2 py-1 rounded-lg bg-[#6B48FF] text-white text-[10px] font-semibold hover:bg-[#5A3FE6]"
+                      >
+                        Room
+                      </button>
+                    </div>
                   </div>
                 ))
               ) : (
