@@ -236,11 +236,16 @@ export class DAIObservationService {
   ): MotionDetectionResult['motionRegions'] {
     if (pixels.length === 0) return [];
 
-    // Calcola bounding box semplice
-    const minX = Math.min(...pixels.map(p => p.x));
-    const maxX = Math.max(...pixels.map(p => p.x));
-    const minY = Math.min(...pixels.map(p => p.y));
-    const maxY = Math.max(...pixels.map(p => p.y));
+    const maxPixels = 20000;
+    const toUse = pixels.length > maxPixels ? pixels.slice(0, maxPixels) : pixels;
+    let minX = toUse[0].x, maxX = toUse[0].x, minY = toUse[0].y, maxY = toUse[0].y;
+    for (let i = 1; i < toUse.length; i++) {
+      const p = toUse[i];
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
 
     return [{
       x: minX / width,

@@ -47,6 +47,7 @@ export function useMotionDetector(
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const intervalRef = useRef<number | null>(null);
   const onMotionDetectedRef = useRef<((result: MotionDetectionResult) => void) | null>(null);
+  const checkRunningRef = useRef(false);
 
   // Setup canvas for frame capture
   useEffect(() => {
@@ -152,16 +153,21 @@ export function useMotionDetector(
   }, [threshold]);
 
   /**
-   * Check for motion
+   * Check for motion (throttled: salta se la precedente esecuzione è ancora in corso)
    */
   const checkMotion = useCallback(() => {
-    if (!enabled) return;
+    if (!enabled || checkRunningRef.current) return;
+    checkRunningRef.current = true;
 
     const currentFrame = captureFrame();
-    if (!currentFrame) return;
+    if (!currentFrame) {
+      checkRunningRef.current = false;
+      return;
+    }
 
     if (!lastFrameRef.current) {
       lastFrameRef.current = currentFrame;
+      checkRunningRef.current = false;
       return;
     }
 
@@ -171,6 +177,7 @@ export function useMotionDetector(
     if (onMotionDetectedRef.current) {
       onMotionDetectedRef.current(result);
     }
+    checkRunningRef.current = false;
   }, [enabled, captureFrame, detectMotion]);
 
   // Start/stop motion detection interval
@@ -208,7 +215,8 @@ export function useMotionDetector(
 }
 
 /**
- * Cluster motion pixels into regions (simplified: single bounding box)
+ * Cluster motion pixels into regions (simplified: single bounding box).
+ * Usa loop per min/max per evitare "Maximum call stack size exceeded" con molti pixel.
  */
 function clusterMotionRegions(
   pixels: { x: number; y: number }[],
@@ -217,10 +225,17 @@ function clusterMotionRegions(
 ): MotionDetectionResult['motionRegions'] {
   if (pixels.length === 0) return [];
 
-  const minX = Math.min(...pixels.map(p => p.x));
-  const maxX = Math.max(...pixels.map(p => p.x));
-  const minY = Math.min(...pixels.map(p => p.y));
-  const maxY = Math.max(...pixels.map(p => p.y));
+  const maxPixels = 20000; // Limite per evitare stack overflow e rallentamenti
+  const toUse = pixels.length > maxPixels ? pixels.slice(0, maxPixels) : pixels;
+
+  let minX = toUse[0].x, maxX = toUse[0].x, minY = toUse[0].y, maxY = toUse[0].y;
+  for (let i = 1; i < toUse.length; i++) {
+    const p = toUse[i];
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
 
   return [{
     x: minX / width,

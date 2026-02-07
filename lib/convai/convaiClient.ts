@@ -1,10 +1,11 @@
 /**
  * Convai client per ZenkAI.
- * L'API key viene recuperata in modo sicuro da /api/convai/token (server-side).
+ * API key: .env.local in root (NEXT_PUBLIC_CONVAI_API_KEY) oppure /api/convai/token.
  */
 
 import { ConvaiClient } from 'convai-web-sdk';
 import type { ConvaiClientParams } from 'convai-web-sdk';
+import { getConvaiApiKeyFromEnv } from './config';
 
 const TOKEN_URL = '/api/convai/token';
 
@@ -13,14 +14,11 @@ export interface ConvaiTokenResponse {
 }
 
 /**
- * Recupera l'API key Convai: prima da .env (NEXT_PUBLIC_CONVAI_API_KEY), altrimenti dal backend /api/convai/token.
+ * Recupera l'API key Convai: prima da lib/convai/config (legge .env.local in root), altrimenti dal backend /api/convai/token.
  */
 export async function getConvaiApiKey(): Promise<string> {
-  const envKey =
-    typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_CONVAI_API_KEY : undefined;
-  if (envKey && envKey.trim() && envKey !== 'tuo_codice') {
-    return envKey.trim();
-  }
+  const envKey = getConvaiApiKeyFromEnv();
+  if (envKey) return envKey;
   const res = await fetch(TOKEN_URL);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

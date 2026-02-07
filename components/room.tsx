@@ -739,9 +739,13 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       convaiClientRef.current = null;
       return;
     }
-    const convaiApiKey = process.env.NEXT_PUBLIC_CONVAI_API_KEY;
-    if (!convaiApiKey?.trim() || convaiApiKey.trim() === 'tuo_codice') {
-      console.warn('ERRORE: API Key Convai mancante nel file .env');
+    const convaiApiKey =
+      typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_CONVAI_API_KEY : undefined;
+    const keyOk = convaiApiKey?.trim() && convaiApiKey.trim() !== 'tuo_codice';
+    if (!keyOk) {
+      console.warn(
+        'ERRORE: API Key Convai mancante nel file .env. Imposta NEXT_PUBLIC_CONVAI_API_KEY in .env.local nella root del progetto (stessa cartella di package.json) e riavvia il server.'
+      );
     }
     setConvaiError(null);
     console.log('Inizializzazione Convai con ID:', characterId);
@@ -2618,13 +2622,15 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
               return (
               <div
                 role="presentation"
-                className="absolute z-20 cursor-grab active:cursor-grabbing rounded-2xl overflow-hidden border-2 border-transparent hover:border-[#6366F1]/60 select-none touch-none"
+                className="absolute z-20 cursor-grab active:cursor-grabbing border-2 border-transparent hover:border-[#6366F1]/60 select-none touch-none"
                 style={{
                   left: `${avatarPosition.xPercent}%`,
                   top: `${avatarPosition.yPercent}%`,
                   transform: 'translate(-50%, -50%)',
                   width: avatarSize.w,
                   height: avatarSize.h,
+                  borderRadius: 20,
+                  overflow: 'hidden',
                   transition: 'box-shadow 0.12s ease-out, border-color 0.2s',
                   boxShadow: glowIntensity > 0
                     ? `0 0 ${glowSize}px rgba(139, 92, 246, ${glowIntensity}), 0 0 ${glowSize * 1.5}px rgba(99, 102, 241, ${glowIntensity * 0.6})`
