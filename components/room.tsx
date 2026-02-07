@@ -654,6 +654,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCameraPaused, setIsCameraPaused] = useState(false);
+  const [customBackgroundImage, setCustomBackgroundImage] = useState<string | null>(null);
 
   // Audio Visualizer
   const [isListening, setIsListening] = useState(false);
@@ -2639,8 +2640,8 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
 
       {/* === COL 2: CENTER (Video & AR) === */}
       <div ref={containerRef} className={`flex-1 relative bg-black flex items-center justify-center overflow-hidden min-h-0 ${isMobile ? 'w-full' : ''}`}>
-        {/* Un solo <video> sempre montato: in Visual full-screen; in Avatar full-screen con blur come sfondo (stesso ref = cattura OSSERVA a risoluzione piena) */}
-        {!isCameraPaused ? (
+        {/* Video sempre montato quando non in pausa (per OSSERVA/motion); nascosto se c'è sfondo custom */}
+        {!isCameraPaused && (
           <video
             ref={videoRef}
             autoPlay
@@ -2649,7 +2650,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
             className="absolute w-full h-full object-cover"
             style={{
               inset: 0,
-              ...(hasAvatarMode ? { zIndex: 0, filter: 'none' } : {}),
+              zIndex: customBackgroundImage ? -1 : 0,
+              visibility: customBackgroundImage ? 'hidden' : 'visible',
+              ...(hasAvatarMode && !customBackgroundImage ? { filter: 'none' } : {}),
               transform: 'translateZ(0)',
               backfaceVisibility: 'hidden',
               WebkitTransform: 'translateZ(0)',
@@ -2657,7 +2660,17 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
               imageRendering: 'auto',
             } as React.CSSProperties}
           />
-        ) : (
+        )}
+        {/* Sfondo custom: l'avatar vede quest'immagine al posto della camera */}
+        {customBackgroundImage && (
+          <img
+            src={customBackgroundImage}
+            alt="Sfondo Room"
+            className="absolute inset-0 w-full h-full object-cover z-0"
+            style={{ transform: 'translateZ(0)', imageRendering: 'auto' }}
+          />
+        )}
+        {isCameraPaused && !customBackgroundImage && (
           <div
             className={`text-gray-500 flex flex-col items-center justify-center gap-4 ${hasAvatarMode ? 'absolute inset-0 z-0 bg-[#18181b]' : 'absolute inset-0'}`}
           >
@@ -3294,8 +3307,42 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       {/* MODAL SETTINGS */}
       {isSettingsOpen && (
         <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-6 backdrop-blur-sm">
-            <div className="bg-[#1E1F20] p-6 rounded-2xl w-full max-w-sm border border-gray-700 shadow-2xl">
+            <div className="bg-[#1E1F20] p-6 rounded-2xl w-full max-w-sm border border-gray-700 shadow-2xl max-h-[90vh] overflow-y-auto">
                 <h3 className="font-bold mb-4 text-white">Impostazioni</h3>
+
+                {/* Sfondo Room: upload immagine (al posto della camera) */}
+                <div className="mb-6 pb-6 border-b border-gray-700">
+                    <div className="text-sm font-medium text-white mb-2">Sfondo Room</div>
+                    <p className="text-xs text-gray-400 mb-3">Carica un&apos;immagine: l&apos;avatar vedrà questo sfondo al posto della camera.</p>
+                    <div className="flex flex-col gap-2">
+                        <label className="flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-[#6366F1]/20 border border-[#6366F1]/50 text-[#818CF8] hover:bg-[#6366F1]/30 cursor-pointer transition-colors text-sm font-medium">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                            Carica immagine sfondo
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file?.type.startsWith('image/')) return;
+                                    const reader = new FileReader();
+                                    reader.onload = () => setCustomBackgroundImage(reader.result as string);
+                                    reader.readAsDataURL(file);
+                                    e.target.value = '';
+                                }}
+                            />
+                        </label>
+                        {customBackgroundImage && (
+                            <button
+                                type="button"
+                                onClick={() => setCustomBackgroundImage(null)}
+                                className="py-2 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-gray-300 text-sm font-medium transition"
+                            >
+                                Rimuovi sfondo (usa camera)
+                            </button>
+                        )}
+                    </div>
+                </div>
                 
                 {/* ROI Snap Toggle */}
                 <div className="mb-6 pb-6 border-b border-gray-700">
