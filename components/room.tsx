@@ -2544,10 +2544,11 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
             muted
             className="absolute w-full h-full object-cover"
             style={{
-              ...(hasAvatarMode ? { inset: 0, zIndex: 0, filter: 'blur(14px)' } : { inset: 0 }),
-              transform: hasAvatarMode ? 'translateZ(0) scale(1.08)' : 'translateZ(0)',
+              inset: 0,
+              ...(hasAvatarMode ? { zIndex: 0, filter: 'none' } : {}),
+              transform: 'translateZ(0)',
               backfaceVisibility: 'hidden',
-              WebkitTransform: hasAvatarMode ? 'translateZ(0) scale(1.08)' : 'translateZ(0)',
+              WebkitTransform: 'translateZ(0)',
               WebkitBackfaceVisibility: 'hidden',
               imageRendering: 'auto',
             } as React.CSSProperties}
@@ -2562,12 +2563,8 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
         )}
 
         {hasAvatarMode ? (
-          /* ---------- MODALITÀ AVATAR: webcam full-screen sfocata come sfondo, overlay scuro, avatar in primo piano ---------- */
+          /* ---------- MODALITÀ AVATAR: webcam a tutto schermo dietro l'avatar, nessun blur/overlay ---------- */
           <>
-            {!isCameraPaused && (
-              <div className="absolute inset-0 bg-black/55 pointer-events-none" style={{ zIndex: 5 }} />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-b from-[#0f0f12]/80 to-[#18181b]/90 pointer-events-none" style={{ zIndex: 10 }} />
             {/* Avatar draggabile - Image-to-Live: pulse da audio, glow viola, effetto bocca */}
             {avatarDisplayData && (() => {
               const isSpeaking = isAiSpeaking || isListening;
