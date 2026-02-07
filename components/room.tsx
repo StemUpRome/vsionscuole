@@ -630,6 +630,8 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   const [convaiReinitTrigger, setConvaiReinitTrigger] = useState(0);
   const lastConvaiReinitAtRef = useRef<number>(0);
   const CONVAI_REINIT_COOLDOWN_MS = 8000;
+  const convaiStreamingTextRef = useRef<string>('');
+  const convaiFlushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Modalità ingresso: Visual (webcam full) vs Avatar (avatar al centro, webcam PiP)
   const hasAvatarMode = Boolean(avatarIdProp);
@@ -756,14 +758,43 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       .then((client) => {
         convaiClientRef.current = client;
         client.setResponseCallback((response: unknown) => {
+          console.log('[Convai] setResponseCallback invoked');
           try {
-            const resp = response as { hasAudioResponse?: () => boolean; getAudioResponse?: () => { getTextData?: () => unknown } };
-            if (!resp?.hasAudioResponse?.() || !resp?.getAudioResponse?.()) return;
-            const raw = resp.getAudioResponse?.()?.getTextData?.();
-            const text = typeof raw === 'string' ? raw : raw != null ? String(raw) : '';
-            if (text.trim()) {
-              console.log('[Convai setResponseCallback] Testo da Regus:', text);
-              setHistory((prev) => [...prev, { sender: 'ai', text: text.trim() }]);
+            const resp = response as {
+              hasAudioResponse?: () => boolean;
+              getAudioResponse?: () => { getTextData?: () => string; getEndOfResponse?: () => boolean };
+            };
+            const hasAudio = resp?.hasAudioResponse?.();
+            if (!hasAudio || !resp?.getAudioResponse?.()) {
+              if (hasAudio === undefined) console.log('[Convai] Risposta senza hasAudioResponse');
+              return;
+            }
+            const audio = resp.getAudioResponse!();
+            const text = typeof audio.getTextData === 'function' ? (audio.getTextData() || '') : '';
+            const endOfResponse = typeof audio.getEndOfResponse === 'function' ? audio.getEndOfResponse() : false;
+            if (text) convaiStreamingTextRef.current += text;
+            if (endOfResponse && convaiStreamingTextRef.current.trim()) {
+              const fullText = convaiStreamingTextRef.current.trim();
+              console.log('[Convai setResponseCallback] Testo da Regus (endOfResponse):', fullText);
+              if (convaiFlushTimeoutRef.current) {
+                clearTimeout(convaiFlushTimeoutRef.current);
+                convaiFlushTimeoutRef.current = null;
+              }
+              setHistory((prev) => [...prev, { sender: 'ai', text: fullText }]);
+              convaiStreamingTextRef.current = '';
+            } else if (text) {
+              console.log('[Convai] Chunk testo (streaming):', text.slice(0, 80), 'endOfResponse=', endOfResponse);
+              if (!convaiFlushTimeoutRef.current) {
+                convaiFlushTimeoutRef.current = setTimeout(() => {
+                  convaiFlushTimeoutRef.current = null;
+                  if (convaiStreamingTextRef.current.trim()) {
+                    const fullText = convaiStreamingTextRef.current.trim();
+                    console.log('[Convai] Flush timeout – testo accumulato:', fullText);
+                    setHistory((prev) => [...prev, { sender: 'ai', text: fullText }]);
+                    convaiStreamingTextRef.current = '';
+                  }
+                }, 2500);
+              }
             }
           } catch (e) {
             console.error('[Convai setResponseCallback] Errore parsing risposta:', e);
@@ -807,6 +838,10 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
     return () => {
       convaiClientRef.current = null;
       setConvaiReady(false);
+      if (convaiFlushTimeoutRef.current) {
+        clearTimeout(convaiFlushTimeoutRef.current);
+        convaiFlushTimeoutRef.current = null;
+      }
     };
   }, [avatarIdProp, convaiReinitTrigger]);
 
@@ -2126,6 +2161,11 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
           if (hasAvatarMode && convaiClientRef.current && !imageBase64) {
               const textToSend = message.trim();
               console.log('Inviando a Convai:', textToSend);
+              convaiStreamingTextRef.current = '';
+              if (convaiFlushTimeoutRef.current) {
+                clearTimeout(convaiFlushTimeoutRef.current);
+                convaiFlushTimeoutRef.current = null;
+              }
               try {
                   convaiClientRef.current.sendTextStream(textToSend);
               } catch (e) {

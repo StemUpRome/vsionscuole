@@ -57,6 +57,7 @@ export async function createConvaiClient(options: CreateConvaiClientOptions): Pr
   const params: ConvaiClientParams = {
     apiKey,
     characterId: options.characterId,
+    speaker: 'User',
     enableAudio: options.enableAudio ?? true,
     languageCode: options.languageCode ?? 'it-IT',
     sessionId: options.sessionId ?? `zenkai-${Date.now()}`,
