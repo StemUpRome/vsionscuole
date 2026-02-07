@@ -59,6 +59,9 @@ export default function NewAvatarPage() {
   const [language, setLanguage] = useState('en')
   const [voice, setVoice] = useState(VOICES[0])
   const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_IMAGES[0])
+  const [imageSourceMode, setImageSourceMode] = useState<'gallery' | 'upload' | 'prompt'>('gallery')
+  const [imagePrompt, setImagePrompt] = useState('')
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false)
   const [convaiCharacterId, setConvaiCharacterId] = useState('')
 
   const [description, setDescription] = useState('')
@@ -108,6 +111,38 @@ export default function NewAvatarPage() {
 
   const removeKnowledgeFile = (id: string) => {
     setKnowledgeFiles((prev) => prev.filter((f) => f.id !== id))
+  }
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !file.type.startsWith('image/')) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result as string
+      setSelectedAvatar(dataUrl)
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  const handleGenerateFromPrompt = async () => {
+    if (!imagePrompt.trim()) return
+    setIsGeneratingImage(true)
+    try {
+      const res = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: imagePrompt.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Errore generazione')
+      if (data.imageUrl) setSelectedAvatar(data.imageUrl)
+    } catch (err) {
+      console.error(err)
+      alert(err instanceof Error ? err.message : 'Impossibile generare l\'immagine. Riprova.')
+    } finally {
+      setIsGeneratingImage(false)
+    }
   }
 
   const handleCreateAvatar = () => {
@@ -218,27 +253,92 @@ export default function NewAvatarPage() {
           {step === 1 && (
             <div className="flex flex-col lg:flex-row gap-8 max-w-5xl">
               <div className="flex flex-col">
-                <div className="aspect-[3/4] max-w-sm rounded-2xl overflow-hidden bg-[#2C2C2E] mb-4">
+                <div className="aspect-[3/4] max-w-sm rounded-2xl overflow-hidden bg-[#2C2C2E] mb-4 border border-[#2C2C2E]">
                   <img
                     src={selectedAvatar}
                     alt="Avatar"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover object-top"
                   />
                 </div>
-                <div className="grid grid-cols-6 gap-2">
-                  {THUMBNAILS.map((src) => (
-                    <button
-                      key={src}
-                      type="button"
-                      onClick={() => setSelectedAvatar(src)}
-                      className={`aspect-square rounded-xl overflow-hidden border-2 transition-colors ${
-                        selectedAvatar === src ? 'border-[#6B48FF]' : 'border-[#2C2C2E] hover:border-[#333335]'
-                      }`}
-                    >
-                      <img src={src} alt="" className="w-full h-full object-cover" />
-                    </button>
-                  ))}
+                <p className="text-xs text-[#A0A0A0] mb-2">Anteprima: questa immagine apparirà nella Room.</p>
+                <div className="flex rounded-xl bg-[#2C2C2E] p-1 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setImageSourceMode('gallery')}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      imageSourceMode === 'gallery' ? 'bg-[#6B48FF] text-white' : 'text-[#A0A0A0] hover:text-white'
+                    }`}
+                  >
+                    Galleria
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImageSourceMode('upload')}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      imageSourceMode === 'upload' ? 'bg-[#6B48FF] text-white' : 'text-[#A0A0A0] hover:text-white'
+                    }`}
+                  >
+                    Carica
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImageSourceMode('prompt')}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      imageSourceMode === 'prompt' ? 'bg-[#6B48FF] text-white' : 'text-[#A0A0A0] hover:text-white'
+                    }`}
+                  >
+                    Genera
+                  </button>
                 </div>
+                {imageSourceMode === 'gallery' && (
+                  <div className="grid grid-cols-6 gap-2">
+                    {THUMBNAILS.map((src) => (
+                      <button
+                        key={src}
+                        type="button"
+                        onClick={() => setSelectedAvatar(src)}
+                        className={`aspect-square rounded-xl overflow-hidden border-2 transition-colors ${
+                          selectedAvatar === src ? 'border-[#6B48FF]' : 'border-[#2C2C2E] hover:border-[#333335]'
+                        }`}
+                      >
+                        <img src={src} alt="" className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {imageSourceMode === 'upload' && (
+                  <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#2C2C2E] hover:border-[#6B48FF]/50 bg-[#2C2C2E]/50 p-6 cursor-pointer transition-colors">
+                    <svg className="w-10 h-10 text-[#A0A0A0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-sm text-[#A0A0A0] text-center">Clicca o trascina un&apos;immagine</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageUpload}
+                    />
+                  </label>
+                )}
+                {imageSourceMode === 'prompt' && (
+                  <div className="space-y-2">
+                    <textarea
+                      value={imagePrompt}
+                      onChange={(e) => setImagePrompt(e.target.value)}
+                      placeholder="Es: ritratto di un tutor amichevole, stile illustrazione, sfondo neutro"
+                      rows={3}
+                      className="w-full px-4 py-3 bg-[#2C2C2E] border border-[#2C2C2E] rounded-xl text-white placeholder-[#A0A0A0] focus:outline-none focus:border-[#6B48FF] resize-none text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleGenerateFromPrompt}
+                      disabled={!imagePrompt.trim() || isGeneratingImage}
+                      className="w-full py-3 bg-[#6B48FF] text-white rounded-xl font-medium hover:bg-[#5A3FE6] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isGeneratingImage ? 'Generazione in corso...' : 'Genera immagine'}
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="flex-1 space-y-6 min-w-[280px] sm:min-w-[320px]">
                 <div>
