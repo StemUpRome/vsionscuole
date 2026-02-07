@@ -31,6 +31,9 @@ import { speak as speakTTS, stopSpeaking, isCurrentlySpeaking } from '../tts/tts
 import { filterMeaningfulEvents } from '../dai/meaningfulEvents';
 import { createConvaiClient } from '../lib/convai/convaiClient';
 import type { ConvaiClient } from 'convai-web-sdk';
+import dynamic from 'next/dynamic';
+
+const RoomObject3D = dynamic(() => import('./RoomObject3D'), { ssr: false });
 // ==========================================
 // 1. TIPI E INTERFACCE (Allineati al Server Adattivo)
 // ==========================================
@@ -655,6 +658,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCameraPaused, setIsCameraPaused] = useState(false);
   const [customBackgroundImage, setCustomBackgroundImage] = useState<string | null>(null);
+  const [customObject3DUrl, setCustomObject3DUrl] = useState<string | null>(null);
+  const [customObject3DType, setCustomObject3DType] = useState<'obj' | 'glb' | 'gltf' | null>(null);
+  const prevObject3DUrlRef = useRef<string | null>(null);
 
   // Audio Visualizer
   const [isListening, setIsListening] = useState(false);
@@ -2740,6 +2746,12 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
               </div>
               );
             })()}
+            {/* Oggetto 3D: visibile nella room così l'avatar può vederlo */}
+            {hasAvatarMode && customObject3DUrl && customObject3DType && (
+              <div className="absolute bottom-4 left-4 z-10 w-48 h-40 sm:w-56 sm:h-44 rounded-2xl overflow-hidden border-2 border-[#6366F1]/50 bg-black/60 shadow-lg">
+                <RoomObject3D objectUrl={customObject3DUrl} objectType={customObject3DType} className="w-full h-full" />
+              </div>
+            )}
           </>
         ) : null}
 
@@ -3341,6 +3353,50 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                         </button>
                     )}
                 </div>
+
+                {/* Oggetto 3D (OBJ/GLB): l'avatar può "vederlo" nella room */}
+                {hasAvatarMode && (
+                <div className="mb-6 pb-6 border-b border-gray-700 rounded-xl bg-[#6366F1]/10 border border-[#6366F1]/30 p-4 -mx-1">
+                    <div className="text-sm font-bold text-[#818CF8] mb-1">📦 Oggetto 3D</div>
+                    <p className="text-xs text-gray-400 mb-3">Carica un modello OBJ o GLB: apparirà nella room e l&apos;avatar potrà vederlo.</p>
+                    <label className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#5A3FE6]/80 hover:bg-[#5A3FE6] text-white cursor-pointer transition-colors text-sm font-semibold border border-[#6366F1]/50">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8 4-8-4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                        Carica OBJ / GLB
+                        <input
+                            type="file"
+                            accept=".obj,.glb,.gltf"
+                            className="hidden"
+                            onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const name = file.name.toLowerCase();
+                                const type = name.endsWith('.obj') ? 'obj' : name.endsWith('.glb') ? 'glb' : name.endsWith('.gltf') ? 'gltf' : null;
+                                if (!type) return;
+                                if (prevObject3DUrlRef.current) URL.revokeObjectURL(prevObject3DUrlRef.current);
+                                const url = URL.createObjectURL(file);
+                                prevObject3DUrlRef.current = url;
+                                setCustomObject3DUrl(url);
+                                setCustomObject3DType(type);
+                                e.target.value = '';
+                            }}
+                        />
+                    </label>
+                    {customObject3DUrl && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (prevObject3DUrlRef.current) URL.revokeObjectURL(prevObject3DUrlRef.current);
+                                prevObject3DUrlRef.current = null;
+                                setCustomObject3DUrl(null);
+                                setCustomObject3DType(null);
+                            }}
+                            className="mt-2 w-full py-2 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-gray-300 text-sm font-medium transition"
+                        >
+                            Rimuovi oggetto 3D
+                        </button>
+                    )}
+                </div>
+                )}
                 
                 {/* ROI Snap Toggle */}
                 <div className="mb-6 pb-6 border-b border-gray-700">
