@@ -693,29 +693,43 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   // Determina se c'è un tool AR attivo
   const hasActiveTool = ui.ar_overlay?.tool_active && ui.ar_overlay.tool_active !== 'none';
 
-  // Convai + dati avatar per modalità Avatar: risolvi da avatarId (localStorage)
+  // Dati avatar per modalità Avatar (sempre quando c'è avatarId, così l'avatar si vede subito)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !avatarIdProp) {
+      setAvatarDisplayData(null);
+      return;
+    }
+    try {
+      const raw = localStorage.getItem('user_avatars');
+      const avatars = raw ? JSON.parse(raw) : [];
+      const avatar = avatars.find((a: { id?: string }) => String(a?.id) === String(avatarIdProp));
+      if (avatar) {
+        setAvatarDisplayData({
+          image: avatar.image || '/avatar-1.png',
+          name: avatar.name || 'Avatar',
+        });
+      } else {
+        setAvatarDisplayData(null);
+      }
+    } catch {
+      setAvatarDisplayData(null);
+    }
+  }, [avatarIdProp]);
+
+  // Convai: inizializza client quando c'è characterId (da avatarId o primo avatar con Convai)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     let characterId: string | null = null;
-    let displayData: { image: string; name: string } | null = null;
     try {
       const raw = localStorage.getItem('user_avatars');
       const avatars = raw ? JSON.parse(raw) : [];
       if (avatarIdProp) {
-        const avatar = avatars.find((a: { id?: string }) => a.id === avatarIdProp);
+        const avatar = avatars.find((a: { id?: string }) => String(a?.id) === String(avatarIdProp));
         characterId = avatar?.convaiCharacterId ?? null;
-        if (avatar) {
-          displayData = {
-            image: avatar.image || '/avatar-1.png',
-            name: avatar.name || 'Avatar',
-          };
-        }
       } else if (avatars.length > 0) {
         const withConvai = avatars.find((a: { convaiCharacterId?: string }) => a.convaiCharacterId);
         characterId = withConvai?.convaiCharacterId ?? null;
       }
-      if (avatarIdProp && displayData) setAvatarDisplayData(displayData);
-      if (!avatarIdProp) setAvatarDisplayData(null);
     } catch {
       characterId = null;
     }
@@ -2519,84 +2533,102 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
 
 
       {/* === COL 2: CENTER (Video & AR) === */}
-      <div ref={containerRef} className={`flex-1 relative bg-black flex items-center justify-center overflow-hidden ${isMobile ? 'w-full' : ''}`}>
+      <div ref={containerRef} className={`flex-1 relative bg-black flex items-center justify-center overflow-hidden min-h-0 ${isMobile ? 'w-full' : ''}`}>
+        {/* Un solo <video> sempre montato: posizionato full-screen (Visual) o in PiP (Avatar) così lo stream resta collegato */}
+        {!isCameraPaused ? (
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="absolute w-full h-full object-cover"
+            style={{
+              ...(hasAvatarMode
+                ? { top: 16, right: 16, left: 'auto', bottom: 'auto', width: 128, height: 128, borderRadius: '9999px', zIndex: 30 }
+                : { inset: 0 }),
+              transform: 'translateZ(0)',
+              backfaceVisibility: 'hidden',
+              WebkitTransform: 'translateZ(0)',
+              WebkitBackfaceVisibility: 'hidden',
+              imageRendering: 'auto',
+            } as React.CSSProperties}
+          />
+        ) : (
+          <div
+            className={`text-gray-500 flex flex-col items-center justify-center gap-4 ${hasAvatarMode ? 'absolute top-4 right-4 z-30 w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-[#2C2C2E]' : 'absolute inset-0'}`}
+            style={hasAvatarMode ? {} : undefined}
+          >
+            <span className="text-6xl">⏸️</span>
+            {!hasAvatarMode && <span>Camera Pausa</span>}
+          </div>
+        )}
+
         {hasAvatarMode ? (
-          /* ---------- MODALITÀ AVATAR: avatar al centro (draggable), webcam PiP ---------- */
+          /* ---------- MODALITÀ AVATAR: sfondo + PiP già sopra, avatar draggabile ---------- */
           <>
-            <div className="absolute inset-0 bg-gradient-to-b from-[#0f0f12] to-[#18181b]" />
-            {/* PiP Webcam - angolo in alto a destra, circolare */}
-            <div className="absolute top-4 right-4 z-30 w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-2 border-[#6366F1]/50 shadow-[0_0_20px_rgba(99,102,241,0.4)] ring-2 ring-black/30">
-              {!isCameraPaused ? (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                  style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' } as React.CSSProperties}
-                />
-              ) : (
-                <div className="w-full h-full bg-[#2C2C2E] flex items-center justify-center text-gray-500 text-2xl">⏸</div>
-              )}
-            </div>
-            {/* Avatar draggabile - posizione iniziale in alto a destra, trascinabile ovunque (senza coprire dock) */}
-            {avatarDisplayData && (
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0f0f12] to-[#18181b] pointer-events-none" style={{ zIndex: 10 }} />
+            {/* Cornice PiP (solo quando camera attiva, il video è già sopra) */}
+            {!isCameraPaused && (
+              <div className="absolute top-4 right-4 z-30 w-28 h-28 sm:w-32 sm:h-32 rounded-full border-2 border-[#6366F1]/50 shadow-[0_0_20px_rgba(99,102,241,0.4)] ring-2 ring-black/30 pointer-events-none" />
+            )}
+            {/* Avatar draggabile - Image-to-Live: pulse da audio, glow viola, effetto bocca */}
+            {avatarDisplayData && (() => {
+              const isSpeaking = isAiSpeaking || isListening;
+              const avgLevel = (audioLevels[0] + audioLevels[1] + audioLevels[2]) / 3;
+              const pulseScale = isSpeaking ? 1 + Math.min(0.08, (avgLevel || 0) / 180) : 1;
+              const midLevel = audioLevels[1] ?? 0;
+              const mouthThreshold = 18;
+              const mouthOpen = isSpeaking ? (midLevel > mouthThreshold ? 1.028 : 1) : 1;
+              const glowIntensity = isSpeaking ? 0.25 + Math.min(0.5, (avgLevel || 0) / 120) : 0;
+              const glowSize = isSpeaking ? 24 + Math.min(36, (avgLevel || 0) / 3) : 0;
+              return (
               <div
                 role="presentation"
-                className="absolute z-20 cursor-grab active:cursor-grabbing rounded-2xl overflow-hidden border-2 border-transparent hover:border-[#6366F1]/60 hover:shadow-[0_0_30px_rgba(99,102,241,0.4)] transition-all duration-200 select-none touch-none"
+                className="absolute z-20 cursor-grab active:cursor-grabbing rounded-2xl overflow-hidden border-2 border-transparent hover:border-[#6366F1]/60 select-none touch-none"
                 style={{
                   left: `${avatarPosition.xPercent}%`,
                   top: `${avatarPosition.yPercent}%`,
                   transform: 'translate(-50%, -50%)',
                   width: avatarSize.w,
                   height: avatarSize.h,
+                  transition: 'box-shadow 0.12s ease-out, border-color 0.2s',
+                  boxShadow: glowIntensity > 0
+                    ? `0 0 ${glowSize}px rgba(139, 92, 246, ${glowIntensity}), 0 0 ${glowSize * 1.5}px rgba(99, 102, 241, ${glowIntensity * 0.6})`
+                    : 'none',
+                  borderColor: glowIntensity > 0 ? 'rgba(139, 92, 246, 0.5)' : undefined,
                 }}
                 onMouseDown={handleAvatarDragStart}
                 onTouchStart={handleAvatarDragStart}
               >
-                <img
-                  src={avatarDisplayData.image}
-                  alt={avatarDisplayData.name}
-                  className="w-full h-full object-cover pointer-events-none"
-                  draggable={false}
-                />
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent py-2 px-3">
+                <div
+                  className="w-full h-full transition-transform duration-75 ease-out"
+                  style={{
+                    transform: `scale(${pulseScale}) scaleY(${mouthOpen})`,
+                    transformOrigin: 'center bottom',
+                  }}
+                >
+                  <img
+                    src={avatarDisplayData.image}
+                    alt={avatarDisplayData.name}
+                    className="w-full h-full object-cover object-bottom pointer-events-none block"
+                    draggable={false}
+                  />
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent py-2 px-3 pointer-events-none">
                   <p className="text-white text-sm font-semibold truncate">{avatarDisplayData.name}</p>
-                  {convaiReady && (isAiSpeaking || isListening) && (
+                  {convaiReady && isSpeaking && (
                     <div className="flex gap-0.5 h-3 mt-1 items-end">
-                      <div className="w-1 bg-[#818CF8] rounded-full animate-pulse" style={{ height: audioLevels[0] ? `${Math.min(12, audioLevels[0] / 4)}px` : 4 }} />
-                      <div className="w-1 bg-[#818CF8] rounded-full animate-pulse" style={{ height: audioLevels[1] ? `${Math.min(14, audioLevels[1] / 3)}px` : 6 }} />
-                      <div className="w-1 bg-[#818CF8] rounded-full animate-pulse" style={{ height: audioLevels[2] ? `${Math.min(12, audioLevels[2] / 4)}px` : 4 }} />
+                      <div className="w-1 bg-[#818CF8] rounded-full transition-all duration-75" style={{ height: Math.min(12, (audioLevels[0] || 0) / 4) }} />
+                      <div className="w-1 bg-[#818CF8] rounded-full transition-all duration-75" style={{ height: Math.min(14, (audioLevels[1] || 0) / 3) }} />
+                      <div className="w-1 bg-[#818CF8] rounded-full transition-all duration-75" style={{ height: Math.min(12, (audioLevels[2] || 0) / 4) }} />
                     </div>
                   )}
                 </div>
               </div>
-            )}
+              );
+            })()}
           </>
-        ) : (
-          /* ---------- MODALITÀ VISUAL: webcam a tutto schermo, ROI, D.A.I ---------- */
-          <>
-        {!isCameraPaused ? (
-             <video 
-                ref={videoRef} 
-                autoPlay 
-                playsInline 
-                muted 
-                className="absolute inset-0 w-full h-full"
-                style={{
-                    objectFit: 'cover',
-                    transform: 'translateZ(0)',
-                    backfaceVisibility: 'hidden',
-                    WebkitTransform: 'translateZ(0)',
-                    WebkitBackfaceVisibility: 'hidden',
-                    WebkitImageRendering: '-webkit-optimize-contrast' // Migliora la nitidezza su WebKit
-                } as React.CSSProperties}
-             />
-         ) : (
-             <div className="text-gray-500 flex flex-col items-center gap-4"><span className="text-6xl">⏸️</span>Camera Pausa</div>
-         )}
-          </>
-        )}
+        ) : null}
 
          {/* Live Vision Toggle */}
          <div className={`absolute ${isMobile ? 'top-2 right-2' : 'top-6 right-6'} z-50`}>
