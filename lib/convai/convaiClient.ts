@@ -13,9 +13,14 @@ export interface ConvaiTokenResponse {
 }
 
 /**
- * Recupera l'API key Convai dal backend (non esporre CONVAI_API_KEY nel client).
+ * Recupera l'API key Convai: prima da .env (NEXT_PUBLIC_CONVAI_API_KEY), altrimenti dal backend /api/convai/token.
  */
 export async function getConvaiApiKey(): Promise<string> {
+  const envKey =
+    typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_CONVAI_API_KEY : undefined;
+  if (envKey && envKey.trim() && envKey !== 'tuo_codice') {
+    return envKey.trim();
+  }
   const res = await fetch(TOKEN_URL);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

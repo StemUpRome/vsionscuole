@@ -739,6 +739,10 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       convaiClientRef.current = null;
       return;
     }
+    const convaiApiKey = process.env.NEXT_PUBLIC_CONVAI_API_KEY;
+    if (!convaiApiKey?.trim() || convaiApiKey.trim() === 'tuo_codice') {
+      console.warn('ERRORE: API Key Convai mancante nel file .env');
+    }
     setConvaiError(null);
     console.log('Inizializzazione Convai con ID:', characterId);
     createConvaiClient({ characterId: characterId.trim(), languageCode: 'it-IT', enableAudio: true })
@@ -748,11 +752,29 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
           const resp = response as { hasAudioResponse?: () => boolean; getAudioResponse?: () => { getTextData?: () => string } };
           if (resp.hasAudioResponse?.() && resp.getAudioResponse?.()) {
             const text = resp.getAudioResponse?.()?.getTextData?.();
-            if (text) setHistory((prev) => [...prev, { sender: 'ai', text }]);
+            // Debug: in console il testo che torna da Regus (Convai)
+            if (text) {
+              console.log('[Convai setResponseCallback] Testo da Regus:', text);
+              setHistory((prev) => [...prev, { sender: 'ai', text }]);
+            }
           }
         });
         client.onAudioPlay(() => setIsAiSpeaking(true));
         client.onAudioStop(() => setIsAiSpeaking(false));
+        // Fallback audio: assicurarsi che l'elemento audio di Convai non sia silenziato/bloccato
+        try {
+          const player = client.getAudioPlayer?.();
+          if (player?.getAudioElement) {
+            const el = player.getAudioElement();
+            if (el) {
+              el.muted = false;
+              el.volume = 1;
+              console.log('[Convai] Audio element unmuted, volume=1');
+            }
+          }
+        } catch (e) {
+          console.warn('[Convai] Impossibile impostare audio element:', e);
+        }
         setConvaiReady(true);
       })
       .catch((err) => {
@@ -1995,6 +2017,10 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   // 7. MOTORE ANALISI (Chiamata al Server)
   // ==========================================
 
+  // Messaggio fisso del pulsante OSSERVA: in hasAvatarMode la cattura va fatta SOLO per questo messaggio, così i messaggi di solo testo usano solo Convai.
+  const OSSERVA_MESSAGE =
+    "Nell'immagine c'è testo/numeri scritti a mano. Prima scrivi esattamente ciò che leggi (es. 'Vedo: 15 + 27 = 33'), poi correggi eventuali errori e dai il feedback educativo.";
+
   // Funzione per inviare messaggi alla chat AI (OpenAI)
   const handleSendMessage = async (message: string) => {
       if (isAnalyzing || !message.trim()) return;
@@ -2006,10 +2032,14 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       setInputText("");
 
       try {
-          // Cattura dalla webcam principale (videoRef = stesso stream in Visual e in Avatar; in Avatar è full-screen con blur ma videoWidth/videoHeight restano a risoluzione piena per OSSERVA)
+          // Cattura dalla webcam SOLO quando serve: non in Avatar+Convai per messaggi di solo testo (solo per OSSERVA)
           let imageBase64: string | null = null;
-          
-          if (!isCameraPaused && videoRef.current && videoRef.current.readyState >= 2) {
+          const needImage =
+            !hasAvatarMode ||
+            !convaiClientRef.current ||
+            message.trim() === OSSERVA_MESSAGE;
+
+          if (needImage && !isCameraPaused && videoRef.current && videoRef.current.readyState >= 2) {
               const vid = videoRef.current;
               const videoWidth = vid.videoWidth || vid.clientWidth || 1920;
               const videoHeight = vid.videoHeight || vid.clientHeight || 1080;
@@ -2581,7 +2611,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
               const avgLevel = (audioLevels[0] + audioLevels[1] + audioLevels[2]) / 3;
               const pulseScale = isSpeaking ? 1 + Math.min(0.08, (avgLevel || 0) / 180) : 1;
               const midLevel = audioLevels[1] ?? 0;
-              const mouthThreshold = 18;
+              const mouthThreshold = 10; // Soglia bassa: bocca si apre anche con audioLevels[1] > 10
               const mouthOpen = isSpeaking ? (midLevel > mouthThreshold ? 1.028 : 1) : 1;
               const glowIntensity = isSpeaking ? 0.25 + Math.min(0.5, (avgLevel || 0) / 120) : 0;
               const glowSize = isSpeaking ? 24 + Math.min(36, (avgLevel || 0) / 3) : 0;
