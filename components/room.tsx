@@ -641,6 +641,8 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   const [avatarDisplayData, setAvatarDisplayData] = useState<{ image: string; name: string } | null>(null);
   const [avatarPosition, setAvatarPosition] = useState({ xPercent: 82, yPercent: 22 });
   const avatarDragRef = useRef<{ isDragging: boolean; startX: number; startY: number; startXPercent: number; startYPercent: number }>({ isDragging: false, startX: 0, startY: 0, startXPercent: 0, startYPercent: 0 });
+  const [object3DPosition, setObject3DPosition] = useState({ xPercent: 25, yPercent: 55 });
+  const object3DDragRef = useRef<{ isDragging: boolean; startX: number; startY: number; startXPercent: number; startYPercent: number }>({ isDragging: false, startX: 0, startY: 0, startXPercent: 0, startYPercent: 0 });
   const avatarSize = { w: 240, h: 320 };
 
   // ==========================================
@@ -2480,6 +2482,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   }, [hasAvatarMode, avatarPosition.xPercent, avatarPosition.yPercent]);
 
   const handleAvatarDragMove = useCallback((e: MouseEvent | TouchEvent) => {
+    if (object3DDragRef.current.isDragging) return;
     if (!avatarDragRef.current.isDragging) return;
     const clientX = 'touches' in e ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX;
     const clientY = 'touches' in e ? (e as TouchEvent).touches[0].clientY : (e as MouseEvent).clientY;
@@ -2496,6 +2499,37 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
     avatarDragRef.current.isDragging = false;
   }, []);
 
+  const handleObject3DDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (!hasAvatarMode) return;
+    e.stopPropagation();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    object3DDragRef.current = {
+      isDragging: true,
+      startX: clientX,
+      startY: clientY,
+      startXPercent: object3DPosition.xPercent,
+      startYPercent: object3DPosition.yPercent,
+    };
+  }, [hasAvatarMode, object3DPosition.xPercent, object3DPosition.yPercent]);
+
+  const handleObject3DDragMove = useCallback((e: MouseEvent | TouchEvent) => {
+    if (!object3DDragRef.current.isDragging) return;
+    const clientX = 'touches' in e ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX;
+    const clientY = 'touches' in e ? (e as TouchEvent).touches[0].clientY : (e as MouseEvent).clientY;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const dx = ((clientX - object3DDragRef.current.startX) / rect.width) * 100;
+    const dy = ((clientY - object3DDragRef.current.startY) / rect.height) * 100;
+    const xPercent = Math.max(2, Math.min(98, object3DDragRef.current.startXPercent + dx));
+    const yPercent = Math.max(2, Math.min(85, object3DDragRef.current.startYPercent + dy));
+    setObject3DPosition({ xPercent, yPercent });
+  }, []);
+
+  const handleObject3DDragEnd = useCallback(() => {
+    object3DDragRef.current.isDragging = false;
+  }, []);
+
   useEffect(() => {
     if (!hasAvatarMode) return;
     window.addEventListener('mousemove', handleAvatarDragMove);
@@ -2509,6 +2543,20 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       window.removeEventListener('touchend', handleAvatarDragEnd);
     };
   }, [hasAvatarMode, handleAvatarDragMove, handleAvatarDragEnd]);
+
+  useEffect(() => {
+    if (!hasAvatarMode || !customObject3DUrl) return;
+    window.addEventListener('mousemove', handleObject3DDragMove);
+    window.addEventListener('mouseup', handleObject3DDragEnd);
+    window.addEventListener('touchmove', handleObject3DDragMove, { passive: true });
+    window.addEventListener('touchend', handleObject3DDragEnd);
+    return () => {
+      window.removeEventListener('mousemove', handleObject3DDragMove);
+      window.removeEventListener('mouseup', handleObject3DDragEnd);
+      window.removeEventListener('touchmove', handleObject3DDragMove);
+      window.removeEventListener('touchend', handleObject3DDragEnd);
+    };
+  }, [hasAvatarMode, customObject3DUrl, handleObject3DDragMove, handleObject3DDragEnd]);
 
   // ==========================================
   // 8. RENDER UI (Layout 3 Colonne Completo)
@@ -2746,10 +2794,27 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
               </div>
               );
             })()}
-            {/* Oggetto 3D: visibile nella room così l'avatar può vederlo */}
+            {/* Oggetto 3D fluttuante e trascinabile come l'avatar */}
             {hasAvatarMode && customObject3DUrl && customObject3DType && (
-              <div className="absolute bottom-4 left-4 z-10 w-48 h-40 sm:w-56 sm:h-44 rounded-2xl overflow-hidden border-2 border-[#6366F1]/50 bg-black/60 shadow-lg">
-                <RoomObject3D objectUrl={customObject3DUrl} objectType={customObject3DType} className="w-full h-full" />
+              <div
+                role="presentation"
+                className="absolute z-10 cursor-grab active:cursor-grabbing rounded-2xl overflow-hidden border-2 border-[#6366F1]/50 bg-black/70 shadow-xl hover:border-[#6366F1]/80 transition-colors select-none touch-none"
+                style={{
+                  left: `${object3DPosition.xPercent}%`,
+                  top: `${object3DPosition.yPercent}%`,
+                  transform: 'translate(-50%, -50%)',
+                  width: 220,
+                  height: 200,
+                }}
+                onMouseDown={handleObject3DDragStart}
+                onTouchStart={handleObject3DDragStart}
+              >
+                <div className="absolute inset-0">
+                  <RoomObject3D objectUrl={customObject3DUrl} objectType={customObject3DType} className="w-full h-full" />
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 py-1.5 px-2 bg-black/70 text-center pointer-events-none">
+                  <span className="text-[10px] text-[#818CF8] font-medium">Trascina per spostare</span>
+                </div>
               </div>
             )}
           </>

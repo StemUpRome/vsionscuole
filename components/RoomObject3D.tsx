@@ -29,6 +29,12 @@ export default function RoomObject3D({ objectUrl, objectType, className = '' }: 
     }
 
     const init = async () => {
+      await new Promise((r) => requestAnimationFrame(r))
+      if (cancelled) return
+      const w = container.clientWidth || 200
+      const h = container.clientHeight || 180
+      if (w < 10 || h < 10) return
+
       const THREE = await import('three')
       const { OBJLoader } = await import('three/examples/jsm/loaders/OBJLoader.js')
       const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js')
@@ -37,10 +43,10 @@ export default function RoomObject3D({ objectUrl, objectType, className = '' }: 
 
       const scene = new THREE.Scene()
       scene.background = null
-      const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000)
+      const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000)
       camera.position.set(0, 0, 3)
       const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })
-      renderer.setSize(container.clientWidth, container.clientHeight)
+      renderer.setSize(w, h)
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
       container.appendChild(renderer.domElement)
 
@@ -93,11 +99,12 @@ export default function RoomObject3D({ objectUrl, objectType, className = '' }: 
 
       const onResize = () => {
         if (!container.parentElement) return
-        const w = container.clientWidth
-        const h = container.clientHeight
-        camera.aspect = w / h
+        const rw = container.clientWidth || w
+        const rh = container.clientHeight || h
+        if (rw < 10 || rh < 10) return
+        camera.aspect = rw / rh
         camera.updateProjectionMatrix()
-        renderer.setSize(w, h)
+        renderer.setSize(rw, rh)
       }
       window.addEventListener('resize', onResize)
 
@@ -122,7 +129,7 @@ export default function RoomObject3D({ objectUrl, objectType, className = '' }: 
     <div
       ref={containerRef}
       className={className}
-      style={{ width: '100%', height: '100%', minHeight: 200 }}
+      style={{ width: '100%', height: '100%', minWidth: 160, minHeight: 140 }}
     />
   )
 }
