@@ -13,11 +13,82 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Theme: variabili per tema chiaro/scuro (switch luna/sole) */
+:root {
+  --bg-page: #1a1a1a;
+  --bg-card: #2c2c2e;
+  --text-primary: #ffffff;
+  --text-muted: #a0a0a0;
+  --border: #2c2c2e;
+}
+
+[data-theme="light"] {
+  --bg-page: #f4f4f5;
+  --bg-card: #ffffff;
+  --text-primary: #18181b;
+  --text-muted: #52525b;
+  --border: #e4e4e7;
+}
+
+/* Override tema chiaro: sfondi e testi usati dall'app */
+[data-theme="light"] body {
+  background-color: var(--bg-page) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] [class*="1A1A1A"] {
+  background-color: var(--bg-page) !important;
+}
+
+[data-theme="light"] [class*="2C2C2E"] {
+  background-color: var(--bg-card) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="light"] .text-white {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] [class*="A0A0A0"] {
+  color: var(--text-muted) !important;
+}
+
+[data-theme="light"] .border-\[\#2C2C2E\] {
+  border-color: var(--border) !important;
+}
+
+[data-theme="light"] .hover\:bg-\[\#2C2C2E\]:hover:hover {
+  background-color: #e4e4e7 !important;
+}
+
+[data-theme="light"] .hover\:border-\[\#333335\]:hover:hover {
+  border-color: #d4d4d8 !important;
+}
+
+[data-theme="light"] .bg-\[\#333335\] {
+  background-color: #e4e4e7 !important;
+}
+
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  background-color: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: var(--text-muted) !important;
+}
+
 body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
   min-height: 100dvh;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
 }
 
 /* Safe area per notch / home indicator (mobile) */
