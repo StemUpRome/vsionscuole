@@ -98,7 +98,7 @@ export default function AvatarsPage() {
   }
 
   const avatars = getFilteredAvatars()
-  const isMyCreations = activeFilter === 'my_creations'
+  const isUserAvatar = (id: string) => userAvatars.some((a) => String(a.id) === String(id))
 
   const deleteAvatar = (avatarId: string | undefined) => {
     if (!avatarId) return
@@ -303,33 +303,33 @@ export default function AvatarsPage() {
                     </div>
                   </div>
                   <div
-                    className="p-4 flex flex-col gap-2"
+                    className="p-4 flex flex-col gap-2 min-h-[72px]"
                     role="button"
                     tabIndex={0}
                     onClick={() => router.push(`/avatars/${avatar.id}`)}
                     onKeyDown={(e) => e.key === 'Enter' && router.push(`/avatars/${avatar.id}`)}
                   >
                     <p className="text-white font-medium text-sm truncate">{avatar.name}</p>
-                    {isMyCreations && (
-                      <div className="flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                    {isUserAvatar(avatar.id) && (
+                      <div className="flex flex-wrap items-center gap-2 mt-1 pt-2 border-t border-[#3F3F46] shrink-0" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); router.push(`/avatars/${avatar.id}`); }}
-                          className="px-2 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[10px] font-semibold border border-white/30"
+                          className="px-2.5 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white text-xs font-semibold border border-white/30"
                         >
                           Modifica
                         </button>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); deleteAvatar(avatar.id); }}
-                          className="px-2 py-1 rounded-lg bg-red-500/80 hover:bg-red-500 text-white text-[10px] font-semibold"
+                          className="px-2.5 py-1.5 rounded-lg bg-red-500/80 hover:bg-red-500 text-white text-xs font-semibold"
                         >
                           Elimina
                         </button>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); router.push(`/room/legacy?avatarId=${encodeURIComponent(avatar.id)}`); }}
-                          className="ml-auto px-2 py-1 rounded-lg bg-[#6B48FF] text-white text-[10px] font-semibold hover:bg-[#5A3FE6]"
+                          className="ml-auto px-2.5 py-1.5 rounded-lg bg-[#6B48FF] text-white text-xs font-semibold hover:bg-[#5A3FE6]"
                         >
                           Room
                         </button>
