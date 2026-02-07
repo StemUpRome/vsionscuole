@@ -740,6 +740,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       return;
     }
     setConvaiError(null);
+    console.log('Inizializzazione Convai con ID:', characterId);
     createConvaiClient({ characterId: characterId.trim(), languageCode: 'it-IT', enableAudio: true })
       .then((client) => {
         convaiClientRef.current = client;
@@ -2070,9 +2071,19 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
               }
           }
 
-          // Limita la cronologia per evitare payload troppo grandi (stesso limite per chat e OSSERVA)
-          const historyToSend = history.slice(-20);
+          // In modalità Avatar con Convai: messaggio solo testo → risposta esclusivamente da Regus (Character ID), niente OpenAI
+          if (hasAvatarMode && convaiClientRef.current && !imageBase64) {
+              try {
+                  convaiClientRef.current.sendTextStream(message.trim());
+              } catch (e) {
+                  console.warn('[Convai] sendTextStream:', e);
+                  setHistory(prev => [...prev, { sender: 'ai', text: 'Errore invio a Convai. Riprova.' }]);
+              }
+              return;
+          }
 
+          // Con immagine (OSSERVA) o senza Convai: usa OpenAI; se Convai attivo, la risposta viene poi detta da Regus
+          const historyToSend = history.slice(-20);
           const response = await fetch('/api/chat', {
               method: 'POST',
               headers: {
@@ -2106,7 +2117,6 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
           if (convaiClientRef.current) {
             try { convaiClientRef.current.sendTextStream(aiText); } catch (e) { console.warn('[Convai] sendTextStream:', e); }
           }
-          // Convai è inizializzato con convaiCharacterId dell'avatar (da URL avatarId) in useEffect; sendTextStream fa parlare l'avatar con la risposta
           
       } catch (error) {
           console.error('Errore nella chat AI:', error);
