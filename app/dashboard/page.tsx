@@ -21,7 +21,7 @@ export default function DashboardPage() {
     }))
   }, [])
 
-  useEffect(() => {
+  const loadAvatars = () => {
     const savedAvatars = localStorage.getItem('user_avatars')
     if (savedAvatars) {
       try {
@@ -31,7 +31,27 @@ export default function DashboardPage() {
         console.error('Error loading avatars:', e)
       }
     }
+  }
+
+  useEffect(() => {
+    loadAvatars()
   }, [])
+
+  const deleteAvatar = (avatarId: string | undefined) => {
+    if (!avatarId) return
+    if (!confirm('Eliminare questo avatar? L\'azione non si può annullare.')) return
+    try {
+      const saved = localStorage.getItem('user_avatars')
+      if (!saved) return
+      const avatars = JSON.parse(saved)
+      const next = avatars.filter((a: any) => String(a?.id) !== String(avatarId))
+      localStorage.setItem('user_avatars', JSON.stringify(next))
+      loadAvatars()
+      window.dispatchEvent(new Event('avatar-saved'))
+    } catch (e) {
+      console.error('Error deleting avatar:', e)
+    }
+  }
 
   const getGreeting = () => {
     const hour = new Date().getHours()
@@ -285,11 +305,25 @@ export default function DashboardPage() {
                         <p className="text-white font-medium text-xs sm:text-sm truncate">{avatar.name || `Avatar ${index + 1}`}</p>
                       </div>
                     </div>
-                    <div className="absolute bottom-2 right-2">
+                    <div className="absolute bottom-2 left-2 right-2 flex flex-wrap items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); router.push(`/room/legacy?avatarId=${encodeURIComponent(avatar.id || index)}`); }}
-                        className="px-2 py-1 rounded-lg bg-[#6B48FF] text-white text-[10px] font-semibold hover:bg-[#5A3FE6]"
+                        onClick={(e) => { e.stopPropagation(); router.push(`/avatars/${avatar.id}`); }}
+                        className="px-2 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[10px] font-semibold border border-white/30"
+                      >
+                        Modifica
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); deleteAvatar(avatar.id); }}
+                        className="px-2 py-1 rounded-lg bg-red-500/80 hover:bg-red-500 text-white text-[10px] font-semibold"
+                      >
+                        Elimina
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); router.push(`/room/legacy?avatarId=${encodeURIComponent(avatar.id)}`); }}
+                        className="ml-auto px-2 py-1 rounded-lg bg-[#6B48FF] text-white text-[10px] font-semibold hover:bg-[#5A3FE6]"
                       >
                         Room
                       </button>
