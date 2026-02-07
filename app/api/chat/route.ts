@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Normalizza immagine: deve essere data:image/jpeg;base64,... (o data:image/png;base64,...)
-    const imageBase64 = normalizeImageUrl(rawImage);
+    const imageBase64 = normalizeImageUrl(rawImage ?? '');
 
     // Prepara il contenuto del messaggio utente (testo + immagine se disponibile)
     let userContent: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
@@ -70,13 +70,13 @@ export async function POST(request: NextRequest) {
     const messages = [
       {
         role: 'system',
-        content: 'Sei un assistente educativo AI per ZenkAI. Aiuti gli studenti con esercizi di matematica, italiano, scienze e altre materie. Rispondi in modo chiaro, educativo e incoraggiante. Se l\'utente chiede di visualizzare strumenti didattici, suggeriscili usando il formato [nome strumento]. Quando ricevi un\'immagine: prima leggi e analizza il contenuto scritto (numeri, operazioni, testo, esercizi, formule); poi fornisci feedback educativo su quel contenuto (correzioni, spiegazioni, incoraggiamenti). Non limitarti a descrivere gli oggetti sulla scrivania: il focus è sempre sul testo e sui contenuti didattici visibili.'
+        content: 'Sei un assistente educativo AI per ZenkAI. Aiuti gli studenti con esercizi di matematica, italiano, scienze e altre materie. Rispondi in modo chiaro, educativo e incoraggiante. Se l\'utente chiede di visualizzare strumenti didattici, suggeriscili usando il formato [nome strumento]. Quando ricevi un\'immagine: (1) Leggi con attenzione i numeri e il testo scritti a mano: descrivi esattamente ciò che vedi (es. "vedo 15 + 27 = 33") prima di correggere; non sostituire cifre o lettere con altre se non sei sicuro della lettura. (2) Solo dopo aver trascritto correttamente, fornisci il feedback educativo (correzioni di calcolo, grammatica, spiegazioni). Il focus è sempre sul contenuto scritto, non sugli oggetti sulla scrivania.'
       },
       // Aggiungi la cronologia della conversazione
-      ...history.map((msg: { sender: string; text: string }) => ({
-        role: msg.sender === 'user' ? 'user' : 'assistant',
-        content: msg.text
-      })),
+      ...(Array.isArray(history) ? history : []).map((msg: unknown) => {
+        const m = msg as { sender?: string; text?: string };
+        return { role: m.sender === 'user' ? 'user' : 'assistant', content: m.text ?? '' };
+      }),
       // Aggiungi il nuovo messaggio (con o senza immagine)
       {
         role: 'user',

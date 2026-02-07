@@ -59,6 +59,7 @@ export default function NewAvatarPage() {
   const [language, setLanguage] = useState('en')
   const [voice, setVoice] = useState(VOICES[0])
   const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_IMAGES[0])
+  const [convaiCharacterId, setConvaiCharacterId] = useState('')
 
   const [description, setDescription] = useState('')
   const [descriptionCharLimit] = useState(200)
@@ -120,6 +121,7 @@ export default function NewAvatarPage() {
       knowledgeFiles,
       aiModel,
       personality,
+      convaiCharacterId: convaiCharacterId.trim() || undefined,
       createdAt: new Date().toISOString(),
     }
     try {
@@ -272,6 +274,17 @@ export default function NewAvatarPage() {
                       <option key={v} value={v}>{v}</option>
                     ))}
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">Convai Character ID</label>
+                  <input
+                    type="text"
+                    value={convaiCharacterId}
+                    onChange={(e) => setConvaiCharacterId(e.target.value)}
+                    className="w-full min-w-0 px-4 py-3 bg-[#2C2C2E] border border-[#2C2C2E] rounded-xl text-white placeholder-[#A0A0A0] focus:outline-none focus:border-[#6B48FF] text-base"
+                    placeholder="ID personaggio Convai (per avatar parlante)"
+                  />
+                  <p className="text-xs text-[#A0A0A0] mt-1">Opzionale. Inserisci l&apos;ID del personaggio da Convai per avere l&apos;avatar parlante in Room.</p>
                 </div>
                 <div className="flex justify-end pt-4">
                   <button

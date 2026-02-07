@@ -69,7 +69,26 @@ NEXT_PUBLIC_API_BASE=https://tuo-api.herokuapp.com
 
 ---
 
-## 4. Riepilogo copia-incolla
+## 4. Convai (avatar parlanti)
+
+Se usi **Convai** per avatar parlanti e interattivi in Room:
+
+| # | Key (copia esatta) | Value (esempio) | Obbligatoria |
+|---|--------------------|-----------------|--------------|
+| 1 | `CONVAI_API_KEY` | `la-tua-api-key-convai` | Solo se usi Convai in Room |
+
+- **Dove trovi il valore:** [Convai](https://convai.com) → accedi → copia la tua API key.
+- La chiave viene usata **solo lato server** (route `/api/convai/token`); non va esposta nel browser.
+- In creazione avatar (step Identity) puoi inserire il **Convai Character ID**; in Room l’avatar userà quel personaggio per la voce.
+
+**Esempio riga per `.env.local` (Convai):**
+```env
+CONVAI_API_KEY=la_tua_api_key_convai
+```
+
+---
+
+## 5. Riepilogo copia-incolla
 
 ### Solo Nhost
 ```env
@@ -91,7 +110,7 @@ NEXT_PUBLIC_API_BASE=https://URL_DEL_TUO_BACKEND
 
 ---
 
-## 5. Netlify – passo passo
+## 6. Netlify – passo passo
 
 1. **Apri** il sito su Netlify → **Site configuration** → **Environment variables**.
 2. Clicca **Add a variable** → **Add single variable** (o **Import from .env** se hai già un file).
@@ -103,7 +122,7 @@ NEXT_PUBLIC_API_BASE=https://URL_DEL_TUO_BACKEND
 
 ---
 
-## 6. Note
+## 7. Note
 
 - Le variabili che iniziano con `NEXT_PUBLIC_` sono visibili nel browser; non mettere segreti (password, admin secret) in queste.
 - Su Netlify, dopo aver aggiunto o modificato variabili, è necessario un nuovo deploy.

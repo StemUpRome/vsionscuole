@@ -265,19 +265,37 @@ export default function DashboardPage() {
                 recentAvatars.map((avatar, index) => (
                   <div
                     key={avatar.id || index}
-                    onClick={() => router.push(`/avatars/${avatar.id || index}`)}
-                    className="bg-[#2C2C2E] rounded-2xl overflow-hidden cursor-pointer hover:bg-[#333335] transition-colors group"
+                    className="bg-[#2C2C2E] rounded-2xl overflow-hidden hover:bg-[#333335] transition-colors group relative"
                   >
-                    <div className="aspect-[3/4] bg-gradient-to-br from-[#2C2C2E] to-[#1A1A1A] relative overflow-hidden">
-                      <img
-                        src={avatar.image || AVATAR_IMAGES[index % AVATAR_IMAGES.length]}
-                        alt={avatar.name || 'Avatar'}
-                        className="w-full h-full object-cover"
-                      />
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => router.push(`/avatars/${avatar.id || index}`)}
+                      onKeyDown={(e) => e.key === 'Enter' && router.push(`/avatars/${avatar.id || index}`)}
+                      className="block"
+                    >
+                      <div className="aspect-[3/4] bg-gradient-to-br from-[#2C2C2E] to-[#1A1A1A] relative overflow-hidden">
+                        <img
+                          src={avatar.image || AVATAR_IMAGES[index % AVATAR_IMAGES.length]}
+                          alt={avatar.name || 'Avatar'}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="p-3 sm:p-4">
+                        <p className="text-white font-medium text-xs sm:text-sm truncate">{avatar.name || `Avatar ${index + 1}`}</p>
+                      </div>
                     </div>
-                    <div className="p-3 sm:p-4">
-                      <p className="text-white font-medium text-xs sm:text-sm truncate">{avatar.name || `Avatar ${index + 1}`}</p>
-                    </div>
+                    {avatar.convaiCharacterId && (
+                      <div className="absolute bottom-2 right-2">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); router.push(`/room/legacy?avatarId=${encodeURIComponent(avatar.id || index)}`); }}
+                          className="px-2 py-1 rounded-lg bg-[#6B48FF] text-white text-[10px] font-semibold hover:bg-[#5A3FE6]"
+                        >
+                          Room
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               ) : (

@@ -29,6 +29,8 @@ import type { ConfirmationState } from '../dai/confidenceGate';
 import { shouldIntervene, formatInterventionMessage, detectDoubtReasons, hashText, fingerprintSnapshot, type Intervention, type DoubtReason, type SnapshotAnalysis } from '../dai/autoIntervention';
 import { speak as speakTTS, stopSpeaking, isCurrentlySpeaking } from '../tts/ttsClient';
 import { filterMeaningfulEvents } from '../dai/meaningfulEvents';
+import { createConvaiClient } from '../lib/convai/convaiClient';
+import type { ConvaiClient } from 'convai-web-sdk';
 // ==========================================
 // 1. TIPI E INTERFACCE (Allineati al Server Adattivo)
 // ==========================================
@@ -597,7 +599,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       default: return null;
     }
   };
-  export default function Room() {
+  export default function Room({ avatarId: avatarIdProp }: { avatarId?: string } = {}) {
     const router = useRouter();
     const navigate = (path: string | number) => {
       if (typeof path === 'number') {
@@ -620,6 +622,11 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   const analyserRef = useRef<AnalyserNode | null>(null);
   const recognitionRef = useRef<any>(null);
   const animationFrameRef = useRef<number | null>(null);
+
+  // Convai: client e stato (avatar parlante)
+  const convaiClientRef = useRef<ConvaiClient | null>(null);
+  const [convaiReady, setConvaiReady] = useState(false);
+  const [convaiError, setConvaiError] = useState<string | null>(null);
 
   // ==========================================
   // 4. STATI APPLICAZIONE
@@ -678,7 +685,57 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   
   // Determina se c'è un tool AR attivo
   const hasActiveTool = ui.ar_overlay?.tool_active && ui.ar_overlay.tool_active !== 'none';
-  
+
+  // Convai: risolvi characterId da avatarId (localStorage) e inizializza client
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let characterId: string | null = null;
+    try {
+      const raw = localStorage.getItem('user_avatars');
+      const avatars = raw ? JSON.parse(raw) : [];
+      if (avatarIdProp) {
+        const avatar = avatars.find((a: { id?: string }) => a.id === avatarIdProp);
+        characterId = avatar?.convaiCharacterId ?? null;
+      } else if (avatars.length > 0) {
+        const withConvai = avatars.find((a: { convaiCharacterId?: string }) => a.convaiCharacterId);
+        characterId = withConvai?.convaiCharacterId ?? null;
+      }
+    } catch {
+      characterId = null;
+    }
+    if (!characterId?.trim()) {
+      setConvaiReady(false);
+      setConvaiError(null);
+      convaiClientRef.current = null;
+      return;
+    }
+    setConvaiError(null);
+    createConvaiClient({ characterId: characterId.trim(), languageCode: 'it-IT', enableAudio: true })
+      .then((client) => {
+        convaiClientRef.current = client;
+        client.setResponseCallback((response: unknown) => {
+          const resp = response as { hasAudioResponse?: () => boolean; getAudioResponse?: () => { getTextData?: () => string } };
+          if (resp.hasAudioResponse?.() && resp.getAudioResponse?.()) {
+            const text = resp.getAudioResponse?.()?.getTextData?.();
+            if (text) setHistory((prev) => [...prev, { sender: 'ai', text }]);
+          }
+        });
+        client.onAudioPlay(() => setIsAiSpeaking(true));
+        client.onAudioStop(() => setIsAiSpeaking(false));
+        setConvaiReady(true);
+      })
+      .catch((err) => {
+        console.error('[Convai] Init error:', err);
+        setConvaiError(err instanceof Error ? err.message : 'Convai non disponibile');
+        setConvaiReady(false);
+        convaiClientRef.current = null;
+      });
+    return () => {
+      convaiClientRef.current = null;
+      setConvaiReady(false);
+    };
+  }, [avatarIdProp]);
+
   // DAI Observation State
   const [daiState, setDaiState] = useState<ObservationState | null>(null);
   const orchestratorRef = useRef<ObservationOrchestrator | null>(null);
@@ -1548,18 +1605,20 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
 
   const startMicrophone = async () => {
       window.speechSynthesis.cancel(); setIsAiSpeaking(false);
+      if (convaiClientRef.current) {
+          try { convaiClientRef.current.startAudioChunk(); setIsListening(true); animateVisualizer(); } catch (e) { console.warn('[Convai] startAudioChunk:', e); }
+          return;
+      }
       try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           const ctx = new (window.AudioContext || window.webkitAudioContext)();
           const ana = ctx.createAnalyser(); ana.fftSize = 64;
           const src = ctx.createMediaStreamSource(stream);
           src.connect(ana);
-          
           audioContextRef.current = ctx;
           analyserRef.current = ana;
           setIsListening(true);
           animateVisualizer();
-
           if ('webkitSpeechRecognition' in window) {
               const rec = new window.webkitSpeechRecognition();
               rec.lang = 'it-IT';
@@ -1574,6 +1633,12 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   };
 
   const stopMicrophone = () => {
+      if (convaiClientRef.current) {
+          try { convaiClientRef.current.endAudioChunk(); } catch (e) { console.warn('[Convai] endAudioChunk:', e); }
+          setIsListening(false);
+          setAudioLevels([10, 15, 10]);
+          return;
+      }
       audioContextRef.current?.close(); recognitionRef.current?.stop();
       setIsListening(false); setAudioLevels([10, 15, 10]);
   };
@@ -1917,7 +1982,10 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
               const vid = videoRef.current;
               const videoWidth = vid.videoWidth || vid.clientWidth || 1920;
               const videoHeight = vid.videoHeight || vid.clientHeight || 1080;
-              const maxDim = 1024;
+              const maxDimFull = 1024;
+              // Area di lavoro: risoluzione maggiore e qualità superiore per leggere meglio numeri/testo scritti a mano
+              const maxDimRoi = 1536;
+              const qualityRoi = 0.92;
 
               const captureFrameWithFlip = (): HTMLCanvasElement | null => {
                   if (videoWidth <= 0 || videoHeight <= 0) return null;
@@ -1934,7 +2002,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                   return canvas;
               };
 
-              const captureAndEncode = (srcCanvas: HTMLCanvasElement, w: number, h: number): string | null => {
+              const captureAndEncode = (srcCanvas: HTMLCanvasElement, w: number, h: number, maxDim: number, quality: number): string | null => {
                   if (w <= 0 || h <= 0) return null;
                   const scale = Math.min(1, maxDim / Math.max(w, h));
                   const outW = Math.round(w * scale);
@@ -1945,7 +2013,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                   const outCtx = out.getContext('2d');
                   if (!outCtx) return null;
                   outCtx.drawImage(srcCanvas, 0, 0, w, h, 0, 0, outW, outH);
-                  const dataUrl = out.toDataURL('image/jpeg', 0.8);
+                  const dataUrl = out.toDataURL('image/jpeg', quality);
                   if (!dataUrl || !dataUrl.startsWith('data:image/jpeg;base64,')) return null;
                   if (dataUrl.length < 100) return null;
                   return dataUrl;
@@ -1964,10 +2032,10 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                       const roiCtx = roiCanvas.getContext('2d');
                       if (roiCtx) {
                           roiCtx.drawImage(fullCanvas, roiX, roiY, roiW, roiH, 0, 0, roiW, roiH);
-                          imageBase64 = captureAndEncode(roiCanvas, roiW, roiH);
+                          imageBase64 = captureAndEncode(roiCanvas, roiW, roiH, maxDimRoi, qualityRoi);
                       }
                   } else {
-                      imageBase64 = captureAndEncode(fullCanvas, videoWidth, videoHeight);
+                      imageBase64 = captureAndEncode(fullCanvas, videoWidth, videoHeight, maxDimFull, 0.8);
                   }
               }
           }
@@ -2002,9 +2070,12 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
           }
 
           const data = await response.json();
-          const aiMessage: ChatMessage = { sender: 'ai', text: data.message || 'Nessuna risposta disponibile' };
-          
+          const aiText = data.message || 'Nessuna risposta disponibile';
+          const aiMessage: ChatMessage = { sender: 'ai', text: aiText };
           setHistory(prev => [...prev, aiMessage]);
+          if (convaiClientRef.current) {
+            try { convaiClientRef.current.sendTextStream(aiText); } catch (e) { console.warn('[Convai] sendTextStream:', e); }
+          }
           
       } catch (error) {
           console.error('Errore nella chat AI:', error);
@@ -2237,7 +2308,11 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
           
           // Risposta AI
           setHistory(prev => [...prev, { sender: 'ai', text: data.spoken_text }]);
-          speak(data.spoken_text);
+          if (convaiClientRef.current) {
+            try { convaiClientRef.current.sendTextStream(data.spoken_text); } catch (e) { console.warn('[Convai] sendTextStream:', e); }
+          } else {
+            speak(data.spoken_text);
+          }
           setActiveHint(-1);
 
       } catch (e) {
@@ -2748,6 +2823,21 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                      <span className={`${isMobile ? 'text-xl' : 'text-3xl'} jarvis-icon-glow`}>🎙️</span>
                  )}
              </button>
+             {convaiReady && (
+                 <div className={`flex items-center gap-2 px-2 py-1 rounded-lg bg-[#18181b]/90 border border-[#6366F1]/40 ${isMobile ? 'absolute bottom-16 left-1/2 -translate-x-1/2' : ''}`} title="Avatar Convai attivo">
+                     <span className="text-[10px] font-semibold text-[#818CF8] uppercase tracking-wider">Lipsync</span>
+                     {(isAiSpeaking || isListening) && (
+                         <div className="flex gap-0.5 h-4 items-end">
+                             <div className="w-1 bg-white/90 rounded-full transition-all duration-75" style={{ height: Math.min(16, (audioLevels[0] || 8) / 2) }} />
+                             <div className="w-1 bg-white/90 rounded-full transition-all duration-75" style={{ height: Math.min(20, (audioLevels[1] || 12) / 2) }} />
+                             <div className="w-1 bg-white/90 rounded-full transition-all duration-75" style={{ height: Math.min(16, (audioLevels[2] || 8) / 2) }} />
+                         </div>
+                     )}
+                 </div>
+             )}
+             {convaiError && (
+                 <span className="text-[10px] text-amber-400" title={convaiError}>Convai: err</span>
+             )}
              
              {/* Pulsante OSSERVA: stessa pipeline della chat (handleSendMessage con messaggio fisso); defer per evitare interferenze dal click */}
              <button
@@ -2755,7 +2845,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                  onClick={(e) => {
                    e.preventDefault();
                    e.stopPropagation();
-                   const msg = "Leggi il contenuto scritto nell'immagine (numeri, testo, esercizi, formule). Fornisci un feedback educativo preciso: correggi eventuali errori (es. calcoli sbagliati), commenta la risposta e aiuta come faresti se l'utente avesse chiesto dalla chat.";
+                   const msg = "Nell'immagine c'è testo/numeri scritti a mano. Prima scrivi esattamente ciò che leggi (es. 'Vedo: 15 + 27 = 33'), poi correggi eventuali errori e dai il feedback educativo.";
                    setTimeout(() => handleSendMessage(msg), 0);
                  }}
                  className={`jarvis-primary ${isMobile ? 'h-14 flex-1 px-4' : 'h-20 px-8'} rounded-2xl text-white font-bold flex items-center justify-center gap-3 text-sm sm:text-base relative overflow-hidden group`}
