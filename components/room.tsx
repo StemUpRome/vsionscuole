@@ -627,6 +627,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   const convaiClientRef = useRef<ConvaiClient | null>(null);
   const [convaiReady, setConvaiReady] = useState(false);
   const [convaiError, setConvaiError] = useState<string | null>(null);
+  const [convaiReinitTrigger, setConvaiReinitTrigger] = useState(0);
+  const lastConvaiReinitAtRef = useRef<number>(0);
+  const CONVAI_REINIT_COOLDOWN_MS = 8000;
 
   // Modalità ingresso: Visual (webcam full) vs Avatar (avatar al centro, webcam PiP)
   const hasAvatarMode = Boolean(avatarIdProp);
@@ -753,14 +756,28 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       .then((client) => {
         convaiClientRef.current = client;
         client.setResponseCallback((response: unknown) => {
-          const resp = response as { hasAudioResponse?: () => boolean; getAudioResponse?: () => { getTextData?: () => string } };
-          if (resp.hasAudioResponse?.() && resp.getAudioResponse?.()) {
-            const text = resp.getAudioResponse?.()?.getTextData?.();
-            // Debug: in console il testo che torna da Regus (Convai)
-            if (text) {
+          try {
+            const resp = response as { hasAudioResponse?: () => boolean; getAudioResponse?: () => { getTextData?: () => unknown } };
+            if (!resp?.hasAudioResponse?.() || !resp?.getAudioResponse?.()) return;
+            const raw = resp.getAudioResponse?.()?.getTextData?.();
+            const text = typeof raw === 'string' ? raw : raw != null ? String(raw) : '';
+            if (text.trim()) {
               console.log('[Convai setResponseCallback] Testo da Regus:', text);
-              setHistory((prev) => [...prev, { sender: 'ai', text }]);
+              setHistory((prev) => [...prev, { sender: 'ai', text: text.trim() }]);
             }
+          } catch (e) {
+            console.error('[Convai setResponseCallback] Errore parsing risposta:', e);
+          }
+        });
+        client.setErrorCallback((type: string, statusMessage: string, status: string) => {
+          console.warn('[Convai] Error callback:', type, statusMessage, status);
+          convaiClientRef.current = null;
+          setConvaiReady(false);
+          setConvaiError(statusMessage || type || 'Connessione Convai persa');
+          const now = Date.now();
+          if (now - lastConvaiReinitAtRef.current >= CONVAI_REINIT_COOLDOWN_MS) {
+            lastConvaiReinitAtRef.current = now;
+            setConvaiReinitTrigger((prev) => prev + 1);
           }
         });
         client.onAudioPlay(() => setIsAiSpeaking(true));
@@ -791,7 +808,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       convaiClientRef.current = null;
       setConvaiReady(false);
     };
-  }, [avatarIdProp]);
+  }, [avatarIdProp, convaiReinitTrigger]);
 
   // DAI Observation State
   const [daiState, setDaiState] = useState<ObservationState | null>(null);
@@ -2107,12 +2124,15 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
 
           // In modalità Avatar con Convai: messaggio solo testo → risposta esclusivamente da Regus (Character ID), niente OpenAI
           if (hasAvatarMode && convaiClientRef.current && !imageBase64) {
+              const textToSend = message.trim();
+              console.log('Inviando a Convai:', textToSend);
               try {
-                  convaiClientRef.current.sendTextStream(message.trim());
+                  convaiClientRef.current.sendTextStream(textToSend);
               } catch (e) {
                   console.warn('[Convai] sendTextStream:', e);
                   setHistory(prev => [...prev, { sender: 'ai', text: 'Errore invio a Convai. Riprova.' }]);
               }
+              setIsAnalyzing(false);
               return;
           }
 
