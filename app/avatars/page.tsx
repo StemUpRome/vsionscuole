@@ -98,6 +98,23 @@ export default function AvatarsPage() {
   }
 
   const avatars = getFilteredAvatars()
+  const isMyCreations = activeFilter === 'my_creations'
+
+  const deleteAvatar = (avatarId: string | undefined) => {
+    if (!avatarId) return
+    if (!confirm('Eliminare questo avatar? L\'azione non si può annullare.')) return
+    try {
+      const saved = localStorage.getItem('user_avatars')
+      if (!saved) return
+      const list = JSON.parse(saved)
+      const next = list.filter((a: UserAvatar) => String(a?.id) !== String(avatarId))
+      localStorage.setItem('user_avatars', JSON.stringify(next))
+      setUserAvatars(next)
+      window.dispatchEvent(new Event('avatar-saved'))
+    } catch (e) {
+      console.error('Error deleting avatar:', e)
+    }
+  }
 
   const filters = [
     { id: 'all', label: 'All' },
@@ -264,22 +281,60 @@ export default function AvatarsPage() {
               avatars.map((avatar) => (
                 <div
                   key={avatar.id}
-                  onClick={() => router.push(`/avatars/${avatar.id}`)}
-                  className="bg-[#2C2C2E] rounded-2xl overflow-hidden cursor-pointer hover:bg-[#333335] transition-colors group"
+                  className="bg-[#2C2C2E] rounded-2xl overflow-hidden hover:bg-[#333335] transition-colors group relative"
                 >
-                  <div className="aspect-square bg-gradient-to-br from-[#2C2C2E] to-[#1A1A1A] relative overflow-hidden">
-                    <img
-                      src={avatar.image || AVATAR_IMAGES[0]}
-                      alt={avatar.name}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.src = AVATAR_IMAGES[0]
-                      }}
-                    />
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => router.push(`/avatars/${avatar.id}`)}
+                    onKeyDown={(e) => e.key === 'Enter' && router.push(`/avatars/${avatar.id}`)}
+                    className="block cursor-pointer"
+                  >
+                    <div className="aspect-square bg-gradient-to-br from-[#2C2C2E] to-[#1A1A1A] relative overflow-hidden">
+                      <img
+                        src={avatar.image || AVATAR_IMAGES[0]}
+                        alt={avatar.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.src = AVATAR_IMAGES[0]
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="p-4">
+                  <div
+                    className="p-4 flex flex-col gap-2"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => router.push(`/avatars/${avatar.id}`)}
+                    onKeyDown={(e) => e.key === 'Enter' && router.push(`/avatars/${avatar.id}`)}
+                  >
                     <p className="text-white font-medium text-sm truncate">{avatar.name}</p>
+                    {isMyCreations && (
+                      <div className="flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); router.push(`/avatars/${avatar.id}`); }}
+                          className="px-2 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[10px] font-semibold border border-white/30"
+                        >
+                          Modifica
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); deleteAvatar(avatar.id); }}
+                          className="px-2 py-1 rounded-lg bg-red-500/80 hover:bg-red-500 text-white text-[10px] font-semibold"
+                        >
+                          Elimina
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); router.push(`/room/legacy?avatarId=${encodeURIComponent(avatar.id)}`); }}
+                          className="ml-auto px-2 py-1 rounded-lg bg-[#6B48FF] text-white text-[10px] font-semibold hover:bg-[#5A3FE6]"
+                        >
+                          Room
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))
