@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 
 const AVATAR_IMAGES = Array.from({ length: 16 }, (_, i) => `/avatar-${i + 1}.png`)
 
@@ -313,13 +312,17 @@ export default function AvatarsPage() {
                     <p className="text-white font-medium text-sm truncate">{avatar.name}</p>
                     {showActionsOnCards && (
                       <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-[#3F3F46] shrink-0 bg-[#1F1F23] -mx-1 px-2 py-1.5 rounded-b-lg" onClick={(e) => e.stopPropagation()} data-avatar-actions>
-                        <Link
-                          href={`/avatars/${encodeURIComponent(avatar.id)}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="px-3 py-1.5 rounded-lg bg-white/25 hover:bg-white/35 text-white text-xs font-semibold border border-white/40 no-underline inline-block"
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            router.push(`/avatars/new?edit=${encodeURIComponent(avatar.id)}`)
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-white/25 hover:bg-white/35 text-white text-xs font-semibold border border-white/40"
                         >
                           Modifica
-                        </Link>
+                        </button>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); deleteAvatar(avatar.id); }}

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useMemo, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts'
 
@@ -53,8 +53,10 @@ interface PersonalityState {
 
 export default function NewAvatarPage() {
   const router = useRouter()
-  const [step, setStep] = useState(1)
+  const searchParams = useSearchParams()
+  const editId = searchParams.get('edit')
 
+  const [step, setStep] = useState(1)
   const [name, setName] = useState('Irene')
   const [language, setLanguage] = useState('en')
   const [voice, setVoice] = useState(VOICES[0])
@@ -76,6 +78,36 @@ export default function NewAvatarPage() {
     agreeableness: 65,
     neuroticism: 25,
   })
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !editId) return
+    try {
+      const raw = localStorage.getItem('user_avatars')
+      const avatars = raw ? JSON.parse(raw) : []
+      const found = avatars.find((a: any) => String(a?.id) === String(editId))
+      if (found) {
+        setName(found.name ?? 'Irene')
+        setLanguage(Array.isArray(found.languages) ? (found.languages[0] || 'en') : 'en')
+        setVoice(found.voice ?? VOICES[0])
+        setSelectedAvatar(found.image ?? AVATAR_IMAGES[0])
+        setDescription(found.description ?? '')
+        setKnowledgeFiles(Array.isArray(found.knowledgeFiles) ? found.knowledgeFiles : [])
+        setAiModel(found.aiModel ?? 'gpt-5')
+        setConvaiCharacterId(found.convaiCharacterId ?? '')
+        if (found.personality && typeof found.personality === 'object') {
+          setPersonality({
+            openness: Number(found.personality.openness) || 30,
+            conscientiousness: Number(found.personality.conscientiousness) || 45,
+            extraversion: Number(found.personality.extraversion) || 60,
+            agreeableness: Number(found.personality.agreeableness) || 65,
+            neuroticism: Number(found.personality.neuroticism) || 25,
+          })
+        }
+      }
+    } catch (e) {
+      console.error('Error loading avatar for edit:', e)
+    }
+  }, [editId])
 
   const radarData = useMemo(
     () => [
@@ -146,8 +178,8 @@ export default function NewAvatarPage() {
   }
 
   const handleCreateAvatar = () => {
-    const newAvatar = {
-      id: `user-${Date.now()}`,
+    const payload = {
+      id: editId || `user-${Date.now()}`,
       name,
       image: selectedAvatar,
       languages: [language],
@@ -157,12 +189,23 @@ export default function NewAvatarPage() {
       aiModel,
       personality,
       convaiCharacterId: convaiCharacterId.trim() || undefined,
-      createdAt: new Date().toISOString(),
+      createdAt: (editId ? undefined : new Date().toISOString()) as string | undefined,
     }
     try {
       const existing = localStorage.getItem('user_avatars')
-      const avatars = existing ? JSON.parse(existing) : []
-      avatars.push(newAvatar)
+      const avatars: any[] = existing ? JSON.parse(existing) : []
+      if (editId) {
+        const idx = avatars.findIndex((a: any) => String(a?.id) === String(editId))
+        const existingCreated = avatars[idx]?.createdAt
+        if (idx >= 0) {
+          avatars[idx] = { ...avatars[idx], ...payload, createdAt: existingCreated || new Date().toISOString() }
+        } else {
+          avatars.push({ ...payload, createdAt: new Date().toISOString() })
+        }
+      } else {
+        (payload as any).createdAt = new Date().toISOString()
+        avatars.push(payload)
+      }
       localStorage.setItem('user_avatars', JSON.stringify(avatars))
       window.dispatchEvent(new Event('avatar-saved'))
     } catch (e) {
@@ -235,15 +278,19 @@ export default function NewAvatarPage() {
         <div className="p-6 pb-4 border-b border-[#2C2C2E]">
           <div className="flex items-center gap-2 text-sm mb-2">
             <Link href="/avatars" className="text-[#6B48FF] hover:underline">
-              Create avatar
+              {editId ? 'Modifica avatar' : 'Create avatar'}
             </Link>
             <span className="text-[#A0A0A0]">›</span>
             <span className="text-white">{STEP_NAMES[step - 1]}</span>
           </div>
           <h1 className="text-2xl md:text-3xl font-bold text-white">
-            {step === 1 && 'Create your avatar'}
-            {step === 2 && 'Define what your avatar knows'}
-            {step === 3 && 'Define how your avatar behaves'}
+            {editId
+              ? (step === 1 && 'Modifica identità e immagine')
+              || (step === 2 && 'Modifica conoscenze')
+              || (step === 3 && 'Modifica comportamento')
+              : (step === 1 && 'Create your avatar')
+              || (step === 2 && 'Define what your avatar knows')
+              || (step === 3 && 'Define how your avatar behaves')}
           </h1>
           <p className="text-[#A0A0A0] mt-1">Step {step} of {STEPS}</p>
         </div>
@@ -584,7 +631,7 @@ export default function NewAvatarPage() {
                   onClick={handleCreateAvatar}
                   className="px-8 py-3 bg-[#6B48FF] text-white rounded-xl font-medium hover:bg-[#5A3FE6] transition-colors"
                 >
-                  Create avatar
+                  {editId ? 'Salva modifiche' : 'Create avatar'}
                 </button>
               </div>
             </div>
