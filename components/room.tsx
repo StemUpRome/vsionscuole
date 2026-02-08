@@ -660,6 +660,8 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCameraPaused, setIsCameraPaused] = useState(false);
   const [customBackgroundImage, setCustomBackgroundImage] = useState<string | null>(null);
+  const [backgroundPrompt, setBackgroundPrompt] = useState('');
+  const [isGeneratingBackground, setIsGeneratingBackground] = useState(false);
   const [customObject3DUrl, setCustomObject3DUrl] = useState<string | null>(null);
   const [customObject3DType, setCustomObject3DType] = useState<'obj' | 'glb' | 'gltf' | null>(null);
   const prevObject3DUrlRef = useRef<string | null>(null);
@@ -2086,6 +2088,26 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   const OSSERVA_MESSAGE =
     "Nell'immagine c'è testo/numeri scritti a mano. Prima scrivi esattamente ciò che leggi (es. 'Vedo: 15 + 27 = 33'), poi correggi eventuali errori e dai il feedback educativo.";
 
+  const handleGenerateBackground = async () => {
+    const prompt = backgroundPrompt.trim() || 'aula scolastica moderna, lavagna, scrivania, sfondo neutro e professionale';
+    setIsGeneratingBackground(true);
+    try {
+      const res = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Errore generazione sfondo');
+      if (data.imageUrl) setCustomBackgroundImage(data.imageUrl);
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : 'Impossibile generare lo sfondo. Riprova.');
+    } finally {
+      setIsGeneratingBackground(false);
+    }
+  };
+
   // Funzione per inviare messaggi alla chat AI (OpenAI)
   const handleSendMessage = async (message: string) => {
       if (isAnalyzing || !message.trim()) return;
@@ -3391,7 +3413,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                 <div className="mb-6 pb-6 border-b border-gray-700 rounded-xl bg-[#6366F1]/10 border border-[#6366F1]/30 p-4 -mx-1">
                     <div className="text-sm font-bold text-[#818CF8] mb-1">🖼️ Sfondo Room</div>
                     <p className="text-xs text-gray-400 mb-3">L&apos;avatar vedrà questa immagine al posto della camera.</p>
-                    <label className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#6366F1] hover:bg-[#5A3FE6] text-white cursor-pointer transition-colors text-sm font-semibold border-2 border-[#6366F1]">
+                    <label className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#6366F1] hover:bg-[#5A3FE6] text-white cursor-pointer transition-colors text-sm font-semibold border-2 border-[#6366F1] mb-3">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                         Carica immagine sfondo
                         <input
@@ -3408,6 +3430,24 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                             }}
                         />
                     </label>
+                    <div className="space-y-2 mb-3">
+                        <input
+                            type="text"
+                            value={backgroundPrompt}
+                            onChange={(e) => setBackgroundPrompt(e.target.value)}
+                            placeholder="Es: aula moderna, lavagna, sfondo neutro"
+                            className="w-full px-3 py-2 bg-[#1A1A1A] border border-[#2C2C2E] rounded-lg text-white text-sm placeholder-[#A0A0A0] focus:outline-none focus:border-[#6366F1]"
+                        />
+                        <button
+                            type="button"
+                            onClick={handleGenerateBackground}
+                            disabled={isGeneratingBackground}
+                            className="w-full py-2.5 px-4 rounded-xl bg-[#5A3FE6] hover:bg-[#4F36D1] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors"
+                        >
+                            {isGeneratingBackground ? 'Generazione...' : 'Genera sfondo con AI'}
+                        </button>
+                        <p className="text-[10px] text-[#818CF8]">Usa OPENAI_API_KEY (DALL-E) come per Create Avatar.</p>
+                    </div>
                     {customBackgroundImage && (
                         <button
                             type="button"

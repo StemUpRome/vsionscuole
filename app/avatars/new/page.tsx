@@ -67,7 +67,8 @@ function NewAvatarContent() {
   const [convaiCharacterId, setConvaiCharacterId] = useState('')
 
   const [description, setDescription] = useState('')
-  const [descriptionCharLimit] = useState(200)
+  const [descriptionCharLimit] = useState(2000)
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false)
   const [knowledgeFiles, setKnowledgeFiles] = useState<Array<{ id: string; name: string }>>([])
   const [aiModel, setAiModel] = useState('gpt-5')
 
@@ -174,6 +175,29 @@ function NewAvatarContent() {
       alert(err instanceof Error ? err.message : 'Impossibile generare l\'immagine. Riprova.')
     } finally {
       setIsGeneratingImage(false)
+    }
+  }
+
+  const handleGenerateDescription = async () => {
+    setIsGeneratingDescription(true)
+    try {
+      const res = await fetch('/api/generate-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: description.trim() || 'avatar educativo, tutor',
+          avatarName: name,
+          personality,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Errore generazione')
+      if (data.description) setDescription(data.description.slice(0, descriptionCharLimit))
+    } catch (err) {
+      console.error(err)
+      alert(err instanceof Error ? err.message : 'Impossibile generare la backstory. Riprova.')
+    } finally {
+      setIsGeneratingDescription(false)
     }
   }
 
@@ -384,6 +408,9 @@ function NewAvatarContent() {
                     >
                       {isGeneratingImage ? 'Generazione in corso...' : 'Genera immagine'}
                     </button>
+                    <p className="text-[10px] text-[#818CF8] mt-1">
+                      Usa la chiave OpenAI (DALL-E): imposta <code className="bg-[#2C2C2E] px-1 rounded">OPENAI_API_KEY</code> in .env.local o in Netlify → Environment variables.
+                    </p>
                   </div>
                 )}
               </div>
@@ -465,10 +492,15 @@ function NewAvatarContent() {
                 </div>
                 <button
                   type="button"
-                  className="mt-3 px-4 py-2 bg-[#2C2C2E] border border-[#333335] text-white rounded-xl text-sm font-medium hover:bg-[#333335] transition-colors"
+                  onClick={handleGenerateDescription}
+                  disabled={isGeneratingDescription}
+                  className="mt-3 px-4 py-2 bg-[#6B48FF] text-white rounded-xl text-sm font-medium hover:bg-[#5A3FE6] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {description.trim() ? 'Regenerate with AI' : 'Generate with AI'}
+                  {isGeneratingDescription ? 'Generazione in corso...' : (description.trim() ? 'Rigenera con AI' : 'Genera con AI')}
                 </button>
+                <p className="text-[10px] text-[#818CF8] mt-1">
+                  Usa GPT: imposta <code className="bg-[#2C2C2E] px-1 rounded">OPENAI_API_KEY</code> in .env.local o Netlify per la backstory.
+                </p>
               </div>
 
               <div className="bg-[#2C2C2E] rounded-2xl p-6">
