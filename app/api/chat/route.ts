@@ -12,7 +12,7 @@ function normalizeImageUrl(raw: string): string | null {
 
 export async function POST(request: NextRequest) {
   try {
-    let body: { message?: string; imageBase64?: string; history?: unknown[] };
+    let body: { message?: string; imageBase64?: string; history?: unknown[]; isObserve?: boolean; avatarName?: string };
     try {
       body = await request.json();
     } catch (parseErr) {
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
         { status: 413 }
       );
     }
-    const { message, imageBase64: rawImage, history = [] } = body;
+    const { message, imageBase64: rawImage, history = [], isObserve = false, avatarName } = body;
 
     console.log('[Chat API] Request:', { hasImage: !!rawImage, imageLen: typeof rawImage === 'string' ? rawImage.length : 0, msgLen: message?.length, historyCount: Array.isArray(history) ? history.length : 0 });
 
@@ -66,11 +66,16 @@ export async function POST(request: NextRequest) {
       userContent = message;
     }
 
-    // Prepara i messaggi per OpenAI (formato conversazione)
+    // System prompt: per OSSERVA (immagine laboratorio) = esperto di laboratorio; altrimenti assistente educativo generico
+    const labExpertName = (avatarName && String(avatarName).trim()) || 'esperto di laboratorio';
+    const systemContent = imageBase64 && isObserve
+      ? `Sei ${labExpertName}, un esperto di laboratorio e tutor. L'utente ha premuto OSSERVA e ti sta mostrando un'immagine (sfondo della room o ripresa dalla camera). Analizza gli elementi tecnici visibili nell'immagine: cavi, interruttori, circuiti, strumenti, componenti, collegamenti. Fornisci istruzioni passo-passo chiare e sicure, spiegando cosa osservi e come procedere. Rispondi in italiano, in modo didattico e preciso. Se vedi testo o numeri scritti a mano, trascrivili prima e poi commentali.`
+      : 'Sei un assistente educativo AI per ZenkAI. Aiuti gli studenti con esercizi di matematica, italiano, scienze e altre materie. Rispondi in modo chiaro, educativo e incoraggiante. Se l\'utente chiede di visualizzare strumenti didattici, suggeriscili usando il formato [nome strumento]. Quando ricevi un\'immagine: (1) Leggi con attenzione i numeri e il testo scritti a mano: descrivi esattamente ciò che vedi (es. "vedo 15 + 27 = 33") prima di correggere; non sostituire cifre o lettere con altre se non sei sicuro della lettura. (2) Solo dopo aver trascritto correttamente, fornisci il feedback educativo (correzioni di calcolo, grammatica, spiegazioni). Il focus è sempre sul contenuto scritto, non sugli oggetti sulla scrivania.';
+
     const messages = [
       {
         role: 'system',
-        content: 'Sei un assistente educativo AI per ZenkAI. Aiuti gli studenti con esercizi di matematica, italiano, scienze e altre materie. Rispondi in modo chiaro, educativo e incoraggiante. Se l\'utente chiede di visualizzare strumenti didattici, suggeriscili usando il formato [nome strumento]. Quando ricevi un\'immagine: (1) Leggi con attenzione i numeri e il testo scritti a mano: descrivi esattamente ciò che vedi (es. "vedo 15 + 27 = 33") prima di correggere; non sostituire cifre o lettere con altre se non sei sicuro della lettura. (2) Solo dopo aver trascritto correttamente, fornisci il feedback educativo (correzioni di calcolo, grammatica, spiegazioni). Il focus è sempre sul contenuto scritto, non sugli oggetti sulla scrivania.'
+        content: systemContent
       },
       // Aggiungi la cronologia della conversazione
       ...(Array.isArray(history) ? history : []).map((msg: unknown) => {

@@ -10,11 +10,13 @@ type SpeakOptions = {
   rate?: number
   pitch?: number
   volume?: number
+  onEnd?: () => void
 }
 
 export async function speak(text: string, options: SpeakOptions = {}) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     console.warn('SpeechSynthesis non disponibile in questo ambiente.')
+    options.onEnd?.()
     return
   }
 
@@ -23,6 +25,7 @@ export async function speak(text: string, options: SpeakOptions = {}) {
   if (options.rate) utterance.rate = options.rate
   if (options.pitch) utterance.pitch = options.pitch
   if (options.volume !== undefined) utterance.volume = options.volume
+  if (options.onEnd) utterance.onend = () => options.onEnd!()
 
   window.speechSynthesis.speak(utterance)
 }

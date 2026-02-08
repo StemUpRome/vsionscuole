@@ -29,8 +29,9 @@ import type { ConfirmationState } from '../dai/confidenceGate';
 import { shouldIntervene, formatInterventionMessage, detectDoubtReasons, hashText, fingerprintSnapshot, type Intervention, type DoubtReason, type SnapshotAnalysis } from '../dai/autoIntervention';
 import { speak as speakTTS, stopSpeaking, isCurrentlySpeaking } from '../tts/ttsClient';
 import { filterMeaningfulEvents } from '../dai/meaningfulEvents';
-import { createConvaiClient } from '../lib/convai/convaiClient';
-import type { ConvaiClient } from 'convai-web-sdk';
+// Convai rimosso: risposta vocale tramite Web Speech API (speakTTS)
+// import { createConvaiClient } from '../lib/convai/convaiClient';
+// import type { ConvaiClient } from 'convai-web-sdk';
 import dynamic from 'next/dynamic';
 
 const RoomObject3D = dynamic(() => import('./RoomObject3D'), { ssr: false });
@@ -626,15 +627,10 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   const recognitionRef = useRef<any>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  // Convai: client e stato (avatar parlante)
-  const convaiClientRef = useRef<ConvaiClient | null>(null);
-  const [convaiReady, setConvaiReady] = useState(false);
-  const [convaiError, setConvaiError] = useState<string | null>(null);
-  const [convaiReinitTrigger, setConvaiReinitTrigger] = useState(0);
-  const lastConvaiReinitAtRef = useRef<number>(0);
-  const CONVAI_REINIT_COOLDOWN_MS = 8000;
-  const convaiStreamingTextRef = useRef<string>('');
-  const convaiFlushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Convai rimosso (output vocale con Web Speech API)
+  // const convaiClientRef = useRef<ConvaiClient | null>(null);
+  // const [convaiReady, setConvaiReady] = useState(false);
+  // const [convaiError, setConvaiError] = useState<string | null>(null);
 
   // Modalità ingresso: Visual (webcam full) vs Avatar (avatar al centro, webcam PiP)
   const hasAvatarMode = Boolean(avatarIdProp);
@@ -732,133 +728,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
     }
   }, [avatarIdProp]);
 
-  // Convai: inizializza con convaiCharacterId dell'avatar passato dall'URL (avatarId) così l'identità è quella dell'avatar (es. Regus)
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    let characterId: string | null = null;
-    try {
-      const raw = localStorage.getItem('user_avatars');
-      const avatars = raw ? JSON.parse(raw) : [];
-      if (avatarIdProp) {
-        const avatar = avatars.find((a: { id?: string }) => String(a?.id) === String(avatarIdProp));
-        characterId = avatar?.convaiCharacterId ?? null;
-      } else if (avatars.length > 0) {
-        const withConvai = avatars.find((a: { convaiCharacterId?: string }) => a.convaiCharacterId);
-        characterId = withConvai?.convaiCharacterId ?? null;
-      }
-    } catch {
-      characterId = null;
-    }
-    if (!characterId?.trim()) {
-      console.log('[Convai] Nessun characterId (avatar senza Convai Character ID o avatarId non in lista). Convai disattivato.');
-      setConvaiReady(false);
-      setConvaiError(null);
-      convaiClientRef.current = null;
-      return;
-    }
-    const convaiApiKey =
-      typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_CONVAI_API_KEY : undefined;
-    const keyOk = convaiApiKey?.trim() && convaiApiKey.trim() !== 'tuo_codice';
-    if (!keyOk) {
-      console.warn(
-        '[Convai] API key non trovata nel client. Imposta NEXT_PUBLIC_CONVAI_API_KEY in .env.local (root) e riavvia il server. Verrà tentato /api/convai/token.'
-      );
-    }
-    setConvaiError(null);
-    console.log('[Convai] Inizializzazione con characterId:', characterId);
-    createConvaiClient({ characterId: characterId.trim(), languageCode: 'it-IT', enableAudio: true })
-      .then((client) => {
-        convaiClientRef.current = client;
-        client.setResponseCallback((response: unknown) => {
-          try {
-            const resp = response as {
-              hasAudioResponse?: () => boolean;
-              hasUserQuery?: () => boolean;
-              getAudioResponse?: () => { getTextData?: () => string; getEndOfResponse?: () => boolean };
-            };
-            const hasAudio = resp?.hasAudioResponse?.();
-            const hasUser = resp?.hasUserQuery?.();
-            console.log('[Convai] Response ricevuta:', { hasAudioResponse: !!hasAudio, hasUserQuery: !!hasUser });
-            if (!hasAudio || !resp?.getAudioResponse?.()) {
-              if (hasUser) console.log('[Convai] Ricevuto userQuery (nessun audio ancora)');
-              return;
-            }
-            const audio = resp.getAudioResponse!();
-            const text = typeof audio.getTextData === 'function' ? (audio.getTextData() || '') : '';
-            const endOfResponse = typeof audio.getEndOfResponse === 'function' ? audio.getEndOfResponse() : false;
-            if (text) convaiStreamingTextRef.current += text;
-            if (endOfResponse && convaiStreamingTextRef.current.trim()) {
-              const fullText = convaiStreamingTextRef.current.trim();
-              console.log('[Convai setResponseCallback] Testo da Regus (endOfResponse):', fullText);
-              if (convaiFlushTimeoutRef.current) {
-                clearTimeout(convaiFlushTimeoutRef.current);
-                convaiFlushTimeoutRef.current = null;
-              }
-              setHistory((prev) => [...prev, { sender: 'ai', text: fullText }]);
-              convaiStreamingTextRef.current = '';
-            } else if (text) {
-              console.log('[Convai] Chunk testo (streaming):', text.slice(0, 80), 'endOfResponse=', endOfResponse);
-              if (!convaiFlushTimeoutRef.current) {
-                convaiFlushTimeoutRef.current = setTimeout(() => {
-                  convaiFlushTimeoutRef.current = null;
-                  if (convaiStreamingTextRef.current.trim()) {
-                    const fullText = convaiStreamingTextRef.current.trim();
-                    console.log('[Convai] Flush timeout – testo accumulato:', fullText);
-                    setHistory((prev) => [...prev, { sender: 'ai', text: fullText }]);
-                    convaiStreamingTextRef.current = '';
-                  }
-                }, 2500);
-              }
-            }
-          } catch (e) {
-            console.error('[Convai setResponseCallback] Errore parsing risposta:', e);
-          }
-        });
-        client.setErrorCallback((type: string, statusMessage: string, status: string) => {
-          console.error('[Convai] Error callback – tipo:', type, 'messaggio:', statusMessage, 'status:', status);
-          convaiClientRef.current = null;
-          setConvaiReady(false);
-          setConvaiError(statusMessage || type || 'Connessione Convai persa');
-          const now = Date.now();
-          if (now - lastConvaiReinitAtRef.current >= CONVAI_REINIT_COOLDOWN_MS) {
-            lastConvaiReinitAtRef.current = now;
-            setConvaiReinitTrigger((prev) => prev + 1);
-          }
-        });
-        client.onAudioPlay(() => setIsAiSpeaking(true));
-        client.onAudioStop(() => setIsAiSpeaking(false));
-        // Fallback audio: assicurarsi che l'elemento audio di Convai non sia silenziato/bloccato
-        try {
-          const player = client.getAudioPlayer?.();
-          if (player?.getAudioElement) {
-            const el = player.getAudioElement();
-            if (el) {
-              el.muted = false;
-              el.volume = 1;
-              console.log('[Convai] Audio element unmuted, volume=1');
-            }
-          }
-        } catch (e) {
-          console.warn('[Convai] Impossibile impostare audio element:', e);
-        }
-        setConvaiReady(true);
-      })
-      .catch((err) => {
-        console.error('[Convai] Init error:', err);
-        if (err instanceof Error && err.stack) console.error('[Convai] Stack:', err.stack);
-        setConvaiError(err instanceof Error ? err.message : 'Convai non disponibile');
-        setConvaiReady(false);
-        convaiClientRef.current = null;
-      });
-    return () => {
-      convaiClientRef.current = null;
-      setConvaiReady(false);
-      if (convaiFlushTimeoutRef.current) {
-        clearTimeout(convaiFlushTimeoutRef.current);
-        convaiFlushTimeoutRef.current = null;
-      }
-    };
-  }, [avatarIdProp, convaiReinitTrigger]);
+  // Convai rimosso: voce tramite Web Speech API (speakTTS)
 
   // DAI Observation State
   const [daiState, setDaiState] = useState<ObservationState | null>(null);
@@ -1729,10 +1599,6 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
 
   const startMicrophone = async () => {
       window.speechSynthesis.cancel(); setIsAiSpeaking(false);
-      if (convaiClientRef.current) {
-          try { convaiClientRef.current.startAudioChunk(); setIsListening(true); animateVisualizer(); } catch (e) { console.warn('[Convai] startAudioChunk:', e); }
-          return;
-      }
       try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1757,12 +1623,6 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   };
 
   const stopMicrophone = () => {
-      if (convaiClientRef.current) {
-          try { convaiClientRef.current.endAudioChunk(); } catch (e) { console.warn('[Convai] endAudioChunk:', e); }
-          setIsListening(false);
-          setAudioLevels([10, 15, 10]);
-          return;
-      }
       audioContextRef.current?.close(); recognitionRef.current?.stop();
       setIsListening(false); setAudioLevels([10, 15, 10]);
   };
@@ -2088,9 +1948,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   // 7. MOTORE ANALISI (Chiamata al Server)
   // ==========================================
 
-  // Messaggio fisso del pulsante OSSERVA: in hasAvatarMode la cattura va fatta SOLO per questo messaggio, così i messaggi di solo testo usano solo Convai.
+  // Messaggio fisso del pulsante OSSERVA: analisi immagine visibile (sfondo caricato o frame camera) con GPT come esperto laboratorio.
   const OSSERVA_MESSAGE =
-    "Nell'immagine c'è testo/numeri scritti a mano. Prima scrivi esattamente ciò che leggi (es. 'Vedo: 15 + 27 = 33'), poi correggi eventuali errori e dai il feedback educativo.";
+    "Analizza ciò che vedi in questa immagine (laboratorio, circuiti, strumenti, testo o numeri). Descrivi gli elementi tecnici e fornisci istruzioni passo-passo.";
 
   const handleGenerateBackground = async () => {
     const prompt = backgroundPrompt.trim() || 'aula scolastica moderna, lavagna, scrivania, sfondo neutro e professionale';
@@ -2123,14 +1983,14 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       setInputText("");
 
       try {
-          // Cattura dalla webcam SOLO quando serve: non in Avatar+Convai per messaggi di solo testo (solo per OSSERVA)
+          // Data source per OSSERVA: se c'è uno sfondo caricato usa quello, altrimenti frame della camera.
           let imageBase64: string | null = null;
-          const needImage =
-            !hasAvatarMode ||
-            !convaiClientRef.current ||
-            message.trim() === OSSERVA_MESSAGE;
+          const isObserveMessage = message.trim() === OSSERVA_MESSAGE;
 
-          if (needImage && !isCameraPaused && videoRef.current && videoRef.current.readyState >= 2) {
+          if (isObserveMessage && customBackgroundImage && customBackgroundImage.startsWith('data:image/')) {
+              imageBase64 = customBackgroundImage;
+          } else if (isObserveMessage || !hasAvatarMode) {
+              if (!isCameraPaused && videoRef.current && videoRef.current.readyState >= 2) {
               const vid = videoRef.current;
               const videoWidth = vid.videoWidth || vid.clientWidth || 1920;
               const videoHeight = vid.videoHeight || vid.clientHeight || 1080;
@@ -2190,28 +2050,10 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                       imageBase64 = captureAndEncode(fullCanvas, videoWidth, videoHeight, maxDimFull, 0.8);
                   }
               }
+              }
           }
 
-          // In modalità Avatar con Convai: messaggio solo testo → risposta esclusivamente da Regus (Character ID), niente OpenAI
-          if (hasAvatarMode && convaiClientRef.current && !imageBase64) {
-              const textToSend = message.trim();
-              console.log('[Convai] sendTextStream chiamato, testo:', textToSend);
-              convaiStreamingTextRef.current = '';
-              if (convaiFlushTimeoutRef.current) {
-                clearTimeout(convaiFlushTimeoutRef.current);
-                convaiFlushTimeoutRef.current = null;
-              }
-              try {
-                  convaiClientRef.current.sendTextStream(textToSend);
-              } catch (e) {
-                  console.warn('[Convai] sendTextStream:', e);
-                  setHistory(prev => [...prev, { sender: 'ai', text: 'Errore invio a Convai. Riprova.' }]);
-              }
-              setIsAnalyzing(false);
-              return;
-          }
-
-          // Con immagine (OSSERVA) o senza Convai: usa OpenAI; se Convai attivo, la risposta viene poi detta da Regus
+          // Tutte le richieste vanno a OpenAI (OPENAI_API_KEY in .env.local)
           const historyToSend = history.slice(-20);
           const response = await fetch('/api/chat', {
               method: 'POST',
@@ -2221,7 +2063,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
               body: JSON.stringify({
                   message: message.trim(),
                   imageBase64: imageBase64 ?? null,
-                  history: historyToSend
+                  history: historyToSend,
+                  isObserve: isObserveMessage && !!imageBase64,
+                  avatarName: avatarDisplayData?.name ?? undefined
               })
           });
 
@@ -2243,10 +2087,10 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
           const aiText = data.message || 'Nessuna risposta disponibile';
           const aiMessage: ChatMessage = { sender: 'ai', text: aiText };
           setHistory(prev => [...prev, aiMessage]);
-          if (convaiClientRef.current) {
-            try { convaiClientRef.current.sendTextStream(aiText); } catch (e) { console.warn('[Convai] sendTextStream:', e); }
+          if (hasAvatarMode && aiText) {
+            setIsAiSpeaking(true);
+            speakTTS(aiText, { onEnd: () => setIsAiSpeaking(false) });
           }
-          
       } catch (error) {
           console.error('Errore nella chat AI:', error);
           let text = error instanceof Error ? error.message : 'Errore di connessione. Riprova.';
@@ -2478,11 +2322,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
           
           // Risposta AI
           setHistory(prev => [...prev, { sender: 'ai', text: data.spoken_text }]);
-          if (convaiClientRef.current) {
-            try { convaiClientRef.current.sendTextStream(data.spoken_text); } catch (e) { console.warn('[Convai] sendTextStream:', e); }
-          } else {
-            speak(data.spoken_text);
-          }
+          speak(data.spoken_text);
           setActiveHint(-1);
 
       } catch (e) {
@@ -2809,7 +2649,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent py-2 px-3 pointer-events-none">
                   <p className="text-white text-sm font-semibold truncate">{avatarDisplayData.name}</p>
-                  {convaiReady && isSpeaking && (
+                  {hasAvatarMode && isAiSpeaking && (
                     <div className="flex gap-0.5 h-3 mt-1 items-end">
                       <div className="w-1 bg-[#818CF8] rounded-full transition-all duration-75" style={{ height: Math.min(12, (audioLevels[0] || 0) / 4) }} />
                       <div className="w-1 bg-[#818CF8] rounded-full transition-all duration-75" style={{ height: Math.min(14, (audioLevels[1] || 0) / 3) }} />
@@ -3191,9 +3031,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                      <span className={`${isMobile ? 'text-xl' : 'text-3xl'} jarvis-icon-glow`}>🎙️</span>
                  )}
              </button>
-             {convaiReady && (
-                 <div className={`flex items-center gap-2 px-2 py-1 rounded-lg bg-[#18181b]/90 border border-[#6366F1]/40 ${isMobile ? 'absolute bottom-16 left-1/2 -translate-x-1/2' : ''}`} title="Avatar Convai attivo">
-                     <span className="text-[10px] font-semibold text-[#818CF8] uppercase tracking-wider">Lipsync</span>
+             {false && (
+                 <div className={`flex items-center gap-2 px-2 py-1 rounded-lg bg-[#18181b]/90 border border-[#6366F1]/40 ${isMobile ? 'absolute bottom-16 left-1/2 -translate-x-1/2' : ''}`} title="Avatar vocale (Web Speech)">
+                     <span className="text-[10px] font-semibold text-[#818CF8] uppercase tracking-wider">Voce</span>
                      {(isAiSpeaking || isListening) && (
                          <div className="flex gap-0.5 h-4 items-end">
                              <div className="w-1 bg-white/90 rounded-full transition-all duration-75" style={{ height: Math.min(16, (audioLevels[0] || 8) / 2) }} />
@@ -3203,9 +3043,6 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                      )}
                  </div>
              )}
-             {convaiError && (
-                 <span className="text-[10px] text-amber-400" title={convaiError}>Convai: err</span>
-             )}
              
              {/* Pulsante OSSERVA: stessa pipeline della chat (handleSendMessage con messaggio fisso); defer per evitare interferenze dal click */}
              <button
@@ -3213,7 +3050,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                  onClick={(e) => {
                    e.preventDefault();
                    e.stopPropagation();
-                   const msg = "Nell'immagine c'è testo/numeri scritti a mano. Prima scrivi esattamente ciò che leggi (es. 'Vedo: 15 + 27 = 33'), poi correggi eventuali errori e dai il feedback educativo.";
+                   const msg = OSSERVA_MESSAGE;
                    setTimeout(() => handleSendMessage(msg), 0);
                  }}
                  className={`jarvis-primary ${isMobile ? 'h-14 flex-1 px-4' : 'h-20 px-8'} rounded-2xl text-white font-bold flex items-center justify-center gap-3 text-sm sm:text-base relative overflow-hidden group`}
