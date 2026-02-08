@@ -12,7 +12,15 @@ function normalizeImageUrl(raw: string): string | null {
 
 export async function POST(request: NextRequest) {
   try {
-    let body: { message?: string; imageBase64?: string; history?: unknown[]; isObserve?: boolean; avatarName?: string };
+    let body: {
+      message?: string;
+      imageBase64?: string;
+      history?: unknown[];
+      isObserve?: boolean;
+      avatarName?: string;
+      avatarBackstory?: string;
+      responseLanguage?: string;
+    };
     try {
       body = await request.json();
     } catch (parseErr) {
@@ -22,7 +30,7 @@ export async function POST(request: NextRequest) {
         { status: 413 }
       );
     }
-    const { message, imageBase64: rawImage, history = [], isObserve = false, avatarName } = body;
+    const { message, imageBase64: rawImage, history = [], isObserve = false, avatarName, avatarBackstory, responseLanguage } = body;
 
     console.log('[Chat API] Request:', { hasImage: !!rawImage, imageLen: typeof rawImage === 'string' ? rawImage.length : 0, msgLen: message?.length, historyCount: Array.isArray(history) ? history.length : 0 });
 
@@ -67,11 +75,33 @@ export async function POST(request: NextRequest) {
       userContent = message;
     }
 
-    // System prompt: per OSSERVA (immagine laboratorio) = esperto di laboratorio; altrimenti assistente educativo generico
+    // Istruzione lingua da codice avatar (en, it, es, fr, de)
+    const languageInstructions: Record<string, string> = {
+      en: 'Always respond in English.',
+      it: 'Rispondi sempre in italiano.',
+      es: 'Responde siempre en español.',
+      fr: 'Réponds toujours en français.',
+      de: 'Antworte immer auf Deutsch.',
+    };
+    const langInstruction = responseLanguage && languageInstructions[responseLanguage]
+      ? ` ${languageInstructions[responseLanguage]}`
+      : '';
+
+    // System prompt: se è presente avatar con backstory, usa nome + backstory come tutor; altrimenti comportamento standard
+    const hasAvatarPersona = avatarName && String(avatarName).trim() && avatarBackstory && String(avatarBackstory).trim();
     const labExpertName = (avatarName && String(avatarName).trim()) || 'esperto di laboratorio';
-    const systemContent = imageBase64 && isObserve
-      ? `Sei ${labExpertName}, un esperto di laboratorio e tutor. L'utente ha premuto OSSERVA e ti sta mostrando un'immagine (sfondo della room o ripresa dalla camera). Analizza gli elementi tecnici visibili nell'immagine: cavi, interruttori, circuiti, strumenti, componenti, collegamenti. Fornisci istruzioni passo-passo chiare e sicure, spiegando cosa osservi e come procedere. Rispondi in italiano, in modo didattico e preciso. Se vedi testo o numeri scritti a mano, trascrivili prima e poi commentali.`
-      : 'Sei un assistente educativo AI per ZenkAI. Aiuti gli studenti con esercizi di matematica, italiano, scienze e altre materie. Rispondi in modo chiaro, educativo e incoraggiante. Se l\'utente chiede di visualizzare strumenti didattici, suggeriscili usando il formato [nome strumento]. Quando ricevi un\'immagine: (1) Leggi con attenzione i numeri e il testo scritti a mano: descrivi esattamente ciò che vedi (es. "vedo 15 + 27 = 33") prima di correggere; non sostituire cifre o lettere con altre se non sei sicuro della lettura. (2) Solo dopo aver trascritto correttamente, fornisci il feedback educativo (correzioni di calcolo, grammatica, spiegazioni). Il focus è sempre sul contenuto scritto, non sugli oggetti sulla scrivania.';
+
+    let systemContent: string;
+    if (hasAvatarPersona) {
+      const basePersona = `Sei ${labExpertName}, un tutor educativo per ZenkAI. Il tuo contesto e il tuo ruolo sono i seguenti:\n\n${avatarBackstory.trim()}\n\nRispondi in modo chiaro, educativo e incoraggiante.${langInstruction}`;
+      systemContent = imageBase64 && isObserve
+        ? `${basePersona} L'utente ha premuto OSSERVA e ti sta mostrando un'immagine (sfondo o camera). Analizza gli elementi visibili, fornisci istruzioni passo-passo chiare. Se vedi testo o numeri scritti a mano, trascrivili prima e poi commentali.`
+        : basePersona;
+    } else {
+      systemContent = imageBase64 && isObserve
+        ? `Sei ${labExpertName}, un esperto di laboratorio e tutor. L'utente ha premuto OSSERVA e ti sta mostrando un'immagine (sfondo della room o ripresa dalla camera). Analizza gli elementi tecnici visibili nell'immagine: cavi, interruttori, circuiti, strumenti, componenti, collegamenti. Fornisci istruzioni passo-passo chiare e sicure, spiegando cosa osservi e come procedere. Rispondi in italiano, in modo didattico e preciso. Se vedi testo o numeri scritti a mano, trascrivili prima e poi commentali.`
+        : `Sei un assistente educativo AI per ZenkAI. Aiuti gli studenti con esercizi di matematica, italiano, scienze e altre materie. Rispondi in modo chiaro, educativo e incoraggiante. Se l'utente chiede di visualizzare strumenti didattici, suggeriscili usando il formato [nome strumento]. Quando ricevi un'immagine: (1) Leggi con attenzione i numeri e il testo scritti a mano: descrivi esattamente ciò che vedi (es. "vedo 15 + 27 = 33") prima di correggere; non sostituire cifre o lettere con altre se non sei sicuro della lettura. (2) Solo dopo aver trascritto correttamente, fornisci il feedback educativo (correzioni di calcolo, grammatica, spiegazioni). Il focus è sempre sul contenuto scritto, non sugli oggetti sulla scrivania.${langInstruction}`;
+    }
 
     const messages = [
       {

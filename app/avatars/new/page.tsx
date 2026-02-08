@@ -19,14 +19,15 @@ const LANGUAGES = [
   { value: 'de', label: 'German' },
 ]
 
+// Voci OpenAI TTS (tts-1): usate per /api/tts in Room
 const VOICES = [
-  'English - Female - Warm',
-  'English - Male - Calm',
-  'Italian - Female - Warm',
-  'Italian - Male - Calm',
-  'English - Female - Professional',
-  'English - Male - Professional',
-]
+  { value: 'alloy', label: 'Alloy (neutro)' },
+  { value: 'nova', label: 'Nova (femminile)' },
+  { value: 'onyx', label: 'Onyx (profondo)' },
+  { value: 'shimmer', label: 'Shimmer' },
+  { value: 'echo', label: 'Echo' },
+  { value: 'fable', label: 'Fable' },
+] as const
 
 const AI_MODELS = [
   { value: 'gpt-5', label: 'ChatGPT 5.0' },
@@ -89,7 +90,7 @@ function NewAvatarContent() {
       if (found) {
         setName(found.name ?? 'Irene')
         setLanguage(Array.isArray(found.languages) ? (found.languages[0] || 'en') : 'en')
-        setVoice(found.voice ?? VOICES[0])
+        setVoice(typeof found.voice === 'string' && VOICES.some((v) => v.value === found.voice) ? found.voice : VOICES[0].value)
         setSelectedAvatar(found.image ?? AVATAR_IMAGES[0])
         setDescription(found.description ?? '')
         setKnowledgeFiles(Array.isArray(found.knowledgeFiles) ? found.knowledgeFiles : [])
@@ -207,6 +208,7 @@ function NewAvatarContent() {
       name,
       image: selectedAvatar,
       languages: [language],
+      language,
       voice,
       description,
       knowledgeFiles,
@@ -445,9 +447,10 @@ function NewAvatarContent() {
                     className="w-full min-w-[200px] px-4 py-3 pr-10 bg-[#2C2C2E] border border-[#2C2C2E] rounded-xl text-white focus:outline-none focus:border-[#6B48FF] text-base"
                   >
                     {VOICES.map((v) => (
-                      <option key={v} value={v}>{v}</option>
+                      <option key={v.value} value={v.value}>{v.label}</option>
                     ))}
                   </select>
+                  <p className="text-xs text-[#A0A0A0] mt-1">Voce usata per il TTS (OpenAI) nella Room.</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-white mb-2">Convai Character ID</label>

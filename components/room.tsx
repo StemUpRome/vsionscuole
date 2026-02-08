@@ -634,7 +634,13 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
 
   // Modalità ingresso: Visual (webcam full) vs Avatar (avatar al centro, webcam PiP)
   const hasAvatarMode = Boolean(avatarIdProp);
-  const [avatarDisplayData, setAvatarDisplayData] = useState<{ image: string; name: string } | null>(null);
+  const [avatarDisplayData, setAvatarDisplayData] = useState<{
+    image: string;
+    name: string;
+    language?: string;
+    voice?: string;
+    description?: string;
+  } | null>(null);
   const [avatarPosition, setAvatarPosition] = useState({ xPercent: 82, yPercent: 22 });
   const avatarDragRef = useRef<{ isDragging: boolean; startX: number; startY: number; startXPercent: number; startYPercent: number }>({ isDragging: false, startX: 0, startY: 0, startXPercent: 0, startYPercent: 0 });
   const [object3DPosition, setObject3DPosition] = useState({ xPercent: 25, yPercent: 55 });
@@ -716,9 +722,13 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       const avatars = raw ? JSON.parse(raw) : [];
       const avatar = avatars.find((a: { id?: string }) => String(a?.id) === String(avatarIdProp));
       if (avatar) {
+        const lang = avatar.language ?? (Array.isArray(avatar.languages) ? avatar.languages[0] : undefined);
         setAvatarDisplayData({
           image: avatar.image || '/avatar-1.png',
           name: avatar.name || 'Avatar',
+          language: typeof lang === 'string' ? lang : undefined,
+          voice: typeof avatar.voice === 'string' ? avatar.voice : undefined,
+          description: typeof avatar.description === 'string' ? avatar.description : undefined,
         });
       } else {
         setAvatarDisplayData(null);
@@ -2067,7 +2077,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                   imageBase64: imageBase64 ?? null,
                   history: historyToSend,
                   isObserve: isObserveMessage && !!imageBase64,
-                  avatarName: avatarDisplayData?.name ?? undefined
+                  avatarName: avatarDisplayData?.name ?? undefined,
+                  avatarBackstory: avatarDisplayData?.description ?? undefined,
+                  responseLanguage: avatarDisplayData?.language ?? undefined,
               })
           });
 
@@ -2091,8 +2103,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
           setHistory(prev => [...prev, aiMessage]);
           if (hasAvatarMode && aiText) {
             setIsAiSpeaking(true);
-            const avatarName = avatarDisplayData?.name ?? '';
-            const voice = /tesla/i.test(avatarName) ? 'onyx' : 'nova';
+            const voice = avatarDisplayData?.voice ?? (/tesla/i.test(avatarDisplayData?.name ?? '') ? 'onyx' : 'nova');
             speakTTS(aiText, { voice, onEnd: () => setIsAiSpeaking(false) });
           }
       } catch (error) {
@@ -2647,7 +2658,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                   <img
                     src={avatarDisplayData.image}
                     alt={avatarDisplayData.name}
-                    className="w-full h-full object-cover object-bottom pointer-events-none block"
+                    className={`w-full h-full object-cover object-bottom pointer-events-none block ${isAiSpeaking ? 'avatar-speaking-lips' : ''}`}
                     draggable={false}
                   />
                 </div>

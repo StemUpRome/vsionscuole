@@ -196,3 +196,44 @@ input[type="range"]::-moz-range-thumb {
 .animate-shine {
   animation: shine 2s infinite;
 }
+
+/* Avatar lip-sync: squash & stretch + sottile distorsione area inferiore, ritmo irregolare */
+@keyframes avatar-lip-sync {
+  0% {
+    transform: scaleY(1) scaleX(1);
+    filter: brightness(1);
+  }
+  11% {
+    transform: scaleY(1.02) scaleX(0.998);
+    filter: brightness(1.008);
+  }
+  24% {
+    transform: scaleY(0.992) scaleX(1.003);
+    filter: brightness(0.995);
+  }
+  37% {
+    transform: scaleY(1.018) scaleX(1);
+    filter: brightness(1.005);
+  }
+  52% {
+    transform: scaleY(1) scaleX(0.999);
+    filter: brightness(1);
+  }
+  66% {
+    transform: scaleY(1.022) scaleX(1.001);
+    filter: brightness(1.01);
+  }
+  81% {
+    transform: scaleY(0.996) scaleX(1.002);
+    filter: brightness(0.998);
+  }
+  100% {
+    transform: scaleY(1) scaleX(1);
+    filter: brightness(1);
+  }
+}
+
+.avatar-speaking-lips {
+  transform-origin: center bottom;
+  animation: avatar-lip-sync 0.42s ease-in-out infinite;
+}
