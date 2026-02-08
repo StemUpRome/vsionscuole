@@ -45,20 +45,21 @@ export async function POST(request: NextRequest) {
     // Normalizza immagine: deve essere data:image/jpeg;base64,... (o data:image/png;base64,...)
     const imageBase64 = normalizeImageUrl(rawImage ?? '');
 
-    // Prepara il contenuto del messaggio utente (testo + immagine se disponibile)
-    let userContent: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+    if (imageBase64) {
+      console.log('[Chat API] Invio messaggio con immagine a GPT-4o Vision (lunghezza URL:', imageBase64.length, ')');
+    }
+
+    // Formato richiesto da OpenAI per GPT-4o Vision: content è array con type 'text' e type 'image_url'
+    let userContent: string | Array<{ type: 'text' | 'image_url'; text?: string; image_url?: { url: string; detail?: 'low' | 'high' | 'auto' } }>;
 
     if (imageBase64) {
-      // Payload con immagine: OpenAI accetta data URL nel campo image_url.url
       userContent = [
-        {
-          type: 'text',
-          text: message
-        },
+        { type: 'text', text: message },
         {
           type: 'image_url',
           image_url: {
-            url: imageBase64
+            url: imageBase64,
+            detail: 'high' // migliore analisi per descrizioni/vision
           }
         }
       ];

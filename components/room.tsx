@@ -1983,13 +1983,15 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       setInputText("");
 
       try {
-          // Data source per OSSERVA: se c'è uno sfondo caricato usa quello, altrimenti frame della camera.
+          // In modalità avatar l'avatar deve sempre "vedere": usa sfondo caricato se c'è, altrimenti frame camera.
+          // Per OSSERVA o per qualsiasi messaggio (es. "cosa vedi?") inviamo l'immagine corrente.
           let imageBase64: string | null = null;
           const isObserveMessage = message.trim() === OSSERVA_MESSAGE;
 
-          if (isObserveMessage && customBackgroundImage && customBackgroundImage.startsWith('data:image/')) {
+          if (customBackgroundImage && customBackgroundImage.startsWith('data:image/') && (isObserveMessage || hasAvatarMode)) {
               imageBase64 = customBackgroundImage;
-          } else if (isObserveMessage || !hasAvatarMode) {
+          }
+          if (!imageBase64 && (isObserveMessage || !hasAvatarMode || hasAvatarMode)) {
               if (!isCameraPaused && videoRef.current && videoRef.current.readyState >= 2) {
               const vid = videoRef.current;
               const videoWidth = vid.videoWidth || vid.clientWidth || 1920;
