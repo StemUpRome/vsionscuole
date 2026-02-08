@@ -2091,7 +2091,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
           setHistory(prev => [...prev, aiMessage]);
           if (hasAvatarMode && aiText) {
             setIsAiSpeaking(true);
-            speakTTS(aiText, { onEnd: () => setIsAiSpeaking(false) });
+            const avatarName = avatarDisplayData?.name ?? '';
+            const voice = /tesla/i.test(avatarName) ? 'onyx' : 'nova';
+            speakTTS(aiText, { voice, onEnd: () => setIsAiSpeaking(false) });
           }
       } catch (error) {
           console.error('Errore nella chat AI:', error);
