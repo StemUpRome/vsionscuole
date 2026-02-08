@@ -2015,6 +2015,28 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
               const maxDimRoi = 1536;
               const qualityRoi = 0.92;
 
+              // Evita di inviare frame neri/vuoti: se la camera non dà immagine valida, inviamo senza immagine (no loop "non vedo la camera")
+              const isCanvasBlackOrEmpty = (canvas: HTMLCanvasElement, maxSample = 200): boolean => {
+                  const w = canvas.width;
+                  const h = canvas.height;
+                  if (w <= 0 || h <= 0) return true;
+                  const ctx = canvas.getContext('2d');
+                  if (!ctx) return true;
+                  const data = ctx.getImageData(0, 0, w, h);
+                  const step = Math.max(1, Math.floor((w * h) / maxSample));
+                  let sum = 0;
+                  let count = 0;
+                  for (let i = 0; i < data.data.length; i += 4 * step) {
+                      const r = data.data[i];
+                      const g = data.data[i + 1];
+                      const b = data.data[i + 2];
+                      sum += (r + g + b) / 3;
+                      count++;
+                  }
+                  const avg = count > 0 ? sum / count : 0;
+                  return avg < 15; // soglia bassa: consideriamo "nero" sotto 15
+              };
+
               const captureFrameWithFlip = (): HTMLCanvasElement | null => {
                   if (videoWidth <= 0 || videoHeight <= 0) return null;
                   const canvas = document.createElement('canvas');
@@ -2048,7 +2070,12 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
               };
 
               const fullCanvas = captureFrameWithFlip();
-              if (fullCanvas) {
+              if (fullCanvas && isCanvasBlackOrEmpty(fullCanvas)) {
+                  if (typeof console !== 'undefined' && console.log) {
+                      console.log('[Room] Frame camera nero/vuoto: invio messaggio senza immagine.');
+                  }
+              }
+              if (fullCanvas && !isCanvasBlackOrEmpty(fullCanvas)) {
                   if (liveVisionEnabled && roiBounds.w > 0 && roiBounds.h > 0) {
                       const roiX = Math.floor(roiBounds.x * videoWidth);
                       const roiY = Math.floor(roiBounds.y * videoHeight);
@@ -2060,7 +2087,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                       const roiCtx = roiCanvas.getContext('2d');
                       if (roiCtx) {
                           roiCtx.drawImage(fullCanvas, roiX, roiY, roiW, roiH, 0, 0, roiW, roiH);
-                          imageBase64 = captureAndEncode(roiCanvas, roiW, roiH, maxDimRoi, qualityRoi);
+                          if (!isCanvasBlackOrEmpty(roiCanvas)) {
+                              imageBase64 = captureAndEncode(roiCanvas, roiW, roiH, maxDimRoi, qualityRoi);
+                          }
                       }
                   } else {
                       imageBase64 = captureAndEncode(fullCanvas, videoWidth, videoHeight, maxDimFull, 0.8);
