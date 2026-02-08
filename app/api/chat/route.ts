@@ -92,11 +92,17 @@ export async function POST(request: NextRequest) {
     const displayBackstory = (avatarBackstory && String(avatarBackstory).trim()) || 'Sei un tutor educativo disponibile ad aiutare gli studenti con domande e spiegazioni.';
 
     // System prompt: inizia SEMPRE con nome e identità (nome + backstory), poi il resto
-    const identityBlock = `Il tuo nome è ${displayName}. La tua identità è: ${displayBackstory}`;
+    const identityBlock = `Il tuo nome è ${displayName}. La tua identità è: ${displayBackstory}. Regola importante: se l'utente chiede come ti chiami, chi sei o il tuo nome, rispondi sempre con il tuo nome (${displayName}) e la tua identità. Non dire mai che non vedi nulla dalla camera, che la camera è spenta o che non ricevi immagini.`;
 
-    const restOfPrompt = imageBase64 && isObserve
-      ? ` L'utente ha premuto OSSERVA e ti sta mostrando un'immagine (sfondo della room o ripresa dalla camera). Analizza gli elementi visibili: cavi, interruttori, circuiti, strumenti, componenti, collegamenti. Fornisci istruzioni passo-passo chiare e sicure. Se vedi testo o numeri scritti a mano, trascrivili prima e poi commentali. Rispondi in modo didattico e preciso.`
-      : ` Rispondi in modo chiaro, educativo e incoraggiante. Se l'utente chiede di visualizzare strumenti didattici, suggeriscili con il formato [nome strumento]. Quando ricevi un'immagine: (1) Leggi con attenzione numeri e testo scritti a mano e descrivi esattamente ciò che vedi prima di correggere. (2) Poi fornisci il feedback educativo (correzioni, spiegazioni). Il focus è sul contenuto scritto.${langInstruction}`;
+    let restOfPrompt: string;
+    if (imageBase64 && isObserve) {
+      restOfPrompt = ` In questo messaggio l'utente ha premuto OSSERVA e ti sta mostrando un'immagine (sfondo della room o ripresa dalla camera). Analizza gli elementi visibili e fornisci istruzioni passo-passo chiare. Se vedi testo o numeri scritti a mano, trascrivili prima e poi commentali. Rispondi in modo didattico e preciso.`;
+    } else if (imageBase64) {
+      restOfPrompt = ` In questo messaggio è allegata un'immagine: puoi descriverla o usarla per rispondere. Rispondi in modo chiaro e educativo. Se l'utente chiede il tuo nome o chi sei, rispondi con il tuo nome e la tua identità.${langInstruction}`;
+    } else {
+      // Nessuna immagine: non menzionare camera o visione, evita il loop "non vedo la camera"
+      restOfPrompt = ` Rispondi in modo chiaro, educativo e incoraggiante. Se l'utente chiede di visualizzare strumenti didattici, suggeriscili con il formato [nome strumento]. Non parlare di camera o di immagini: rispondi solo in base al testo della domanda.${langInstruction}`;
+    }
 
     const systemContent = identityBlock + restOfPrompt;
 
