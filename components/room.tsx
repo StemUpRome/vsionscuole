@@ -750,6 +750,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       characterId = null;
     }
     if (!characterId?.trim()) {
+      console.log('[Convai] Nessun characterId (avatar senza Convai Character ID o avatarId non in lista). Convai disattivato.');
       setConvaiReady(false);
       setConvaiError(null);
       convaiClientRef.current = null;
@@ -760,24 +761,26 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
     const keyOk = convaiApiKey?.trim() && convaiApiKey.trim() !== 'tuo_codice';
     if (!keyOk) {
       console.warn(
-        'ERRORE: API Key Convai mancante nel file .env. Imposta NEXT_PUBLIC_CONVAI_API_KEY in .env.local nella root del progetto (stessa cartella di package.json) e riavvia il server.'
+        '[Convai] API key non trovata nel client. Imposta NEXT_PUBLIC_CONVAI_API_KEY in .env.local (root) e riavvia il server. Verrà tentato /api/convai/token.'
       );
     }
     setConvaiError(null);
-    console.log('Inizializzazione Convai con ID:', characterId);
+    console.log('[Convai] Inizializzazione con characterId:', characterId);
     createConvaiClient({ characterId: characterId.trim(), languageCode: 'it-IT', enableAudio: true })
       .then((client) => {
         convaiClientRef.current = client;
         client.setResponseCallback((response: unknown) => {
-          console.log('[Convai] setResponseCallback invoked');
           try {
             const resp = response as {
               hasAudioResponse?: () => boolean;
+              hasUserQuery?: () => boolean;
               getAudioResponse?: () => { getTextData?: () => string; getEndOfResponse?: () => boolean };
             };
             const hasAudio = resp?.hasAudioResponse?.();
+            const hasUser = resp?.hasUserQuery?.();
+            console.log('[Convai] Response ricevuta:', { hasAudioResponse: !!hasAudio, hasUserQuery: !!hasUser });
             if (!hasAudio || !resp?.getAudioResponse?.()) {
-              if (hasAudio === undefined) console.log('[Convai] Risposta senza hasAudioResponse');
+              if (hasUser) console.log('[Convai] Ricevuto userQuery (nessun audio ancora)');
               return;
             }
             const audio = resp.getAudioResponse!();
@@ -812,7 +815,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
           }
         });
         client.setErrorCallback((type: string, statusMessage: string, status: string) => {
-          console.warn('[Convai] Error callback:', type, statusMessage, status);
+          console.error('[Convai] Error callback – tipo:', type, 'messaggio:', statusMessage, 'status:', status);
           convaiClientRef.current = null;
           setConvaiReady(false);
           setConvaiError(statusMessage || type || 'Connessione Convai persa');
@@ -842,6 +845,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       })
       .catch((err) => {
         console.error('[Convai] Init error:', err);
+        if (err instanceof Error && err.stack) console.error('[Convai] Stack:', err.stack);
         setConvaiError(err instanceof Error ? err.message : 'Convai non disponibile');
         setConvaiReady(false);
         convaiClientRef.current = null;
@@ -2191,7 +2195,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
           // In modalità Avatar con Convai: messaggio solo testo → risposta esclusivamente da Regus (Character ID), niente OpenAI
           if (hasAvatarMode && convaiClientRef.current && !imageBase64) {
               const textToSend = message.trim();
-              console.log('Inviando a Convai:', textToSend);
+              console.log('[Convai] sendTextStream chiamato, testo:', textToSend);
               convaiStreamingTextRef.current = '';
               if (convaiFlushTimeoutRef.current) {
                 clearTimeout(convaiFlushTimeoutRef.current);
