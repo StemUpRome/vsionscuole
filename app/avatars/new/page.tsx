@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts'
@@ -51,7 +51,7 @@ interface PersonalityState {
   neuroticism: number
 }
 
-export default function NewAvatarPage() {
+function NewAvatarContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const editId = searchParams.get('edit')
@@ -639,5 +639,17 @@ export default function NewAvatarPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function NewAvatarPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#1A1A1A] flex items-center justify-center text-white">
+        <p className="text-[#A0A0A0]">Caricamento...</p>
+      </div>
+    }>
+      <NewAvatarContent />
+    </Suspense>
   )
 }
