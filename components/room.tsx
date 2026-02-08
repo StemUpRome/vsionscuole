@@ -2065,7 +2065,28 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
               }
           }
 
-          // Tutte le richieste vanno a OpenAI (OPENAI_API_KEY in .env.local)
+          // In modalità avatar: recupera nome e descrizione da localStorage prima di ogni invio (dati sempre aggiornati)
+          let avatarNameForChat: string | undefined;
+          let avatarBackstoryForChat: string | undefined;
+          let responseLanguageForChat: string | undefined;
+          if (hasAvatarMode && avatarIdProp && typeof window !== 'undefined') {
+            try {
+              const raw = localStorage.getItem('user_avatars');
+              const avatars = raw ? JSON.parse(raw) : [];
+              const avatar = avatars.find((a: { id?: string }) => String(a?.id) === String(avatarIdProp));
+              if (avatar) {
+                avatarNameForChat = typeof avatar.name === 'string' && avatar.name.trim() ? avatar.name.trim() : undefined;
+                avatarBackstoryForChat = typeof avatar.description === 'string' && avatar.description.trim() ? avatar.description.trim() : undefined;
+                const lang = avatar.language ?? (Array.isArray(avatar.languages) ? avatar.languages[0] : undefined);
+                responseLanguageForChat = typeof lang === 'string' ? lang : undefined;
+              }
+            } catch (_) { /* ignore */ }
+            // Fallback allo stato se localStorage non ha restituito nulla
+            if (avatarNameForChat === undefined) avatarNameForChat = avatarDisplayData?.name ?? undefined;
+            if (avatarBackstoryForChat === undefined) avatarBackstoryForChat = avatarDisplayData?.description ?? undefined;
+            if (responseLanguageForChat === undefined) responseLanguageForChat = avatarDisplayData?.language ?? undefined;
+          }
+
           const historyToSend = history.slice(-20);
           const response = await fetch('/api/chat', {
               method: 'POST',
@@ -2077,9 +2098,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                   imageBase64: imageBase64 ?? null,
                   history: historyToSend,
                   isObserve: isObserveMessage && !!imageBase64,
-                  avatarName: avatarDisplayData?.name ?? undefined,
-                  avatarBackstory: avatarDisplayData?.description ?? undefined,
-                  responseLanguage: avatarDisplayData?.language ?? undefined,
+                  avatarName: avatarNameForChat ?? avatarDisplayData?.name ?? undefined,
+                  avatarBackstory: avatarBackstoryForChat ?? avatarDisplayData?.description ?? undefined,
+                  responseLanguage: responseLanguageForChat ?? avatarDisplayData?.language ?? undefined,
               })
           });
 

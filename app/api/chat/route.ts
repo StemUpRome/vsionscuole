@@ -87,21 +87,18 @@ export async function POST(request: NextRequest) {
       ? ` ${languageInstructions[responseLanguage]}`
       : '';
 
-    // System prompt: se è presente avatar con backstory, usa nome + backstory come tutor; altrimenti comportamento standard
-    const hasAvatarPersona = avatarName && String(avatarName).trim() && avatarBackstory && String(avatarBackstory).trim();
-    const labExpertName = (avatarName && String(avatarName).trim()) || 'esperto di laboratorio';
+    // Valori di fallback per demo quando nome o backstory non sono forniti
+    const displayName = (avatarName && String(avatarName).trim()) || 'Assistente ZenkAI';
+    const displayBackstory = (avatarBackstory && String(avatarBackstory).trim()) || 'Sei un tutor educativo disponibile ad aiutare gli studenti con domande e spiegazioni.';
 
-    let systemContent: string;
-    if (hasAvatarPersona) {
-      const basePersona = `Sei ${labExpertName}, un tutor educativo per ZenkAI. Il tuo contesto e il tuo ruolo sono i seguenti:\n\n${avatarBackstory.trim()}\n\nRispondi in modo chiaro, educativo e incoraggiante.${langInstruction}`;
-      systemContent = imageBase64 && isObserve
-        ? `${basePersona} L'utente ha premuto OSSERVA e ti sta mostrando un'immagine (sfondo o camera). Analizza gli elementi visibili, fornisci istruzioni passo-passo chiare. Se vedi testo o numeri scritti a mano, trascrivili prima e poi commentali.`
-        : basePersona;
-    } else {
-      systemContent = imageBase64 && isObserve
-        ? `Sei ${labExpertName}, un esperto di laboratorio e tutor. L'utente ha premuto OSSERVA e ti sta mostrando un'immagine (sfondo della room o ripresa dalla camera). Analizza gli elementi tecnici visibili nell'immagine: cavi, interruttori, circuiti, strumenti, componenti, collegamenti. Fornisci istruzioni passo-passo chiare e sicure, spiegando cosa osservi e come procedere. Rispondi in italiano, in modo didattico e preciso. Se vedi testo o numeri scritti a mano, trascrivili prima e poi commentali.`
-        : `Sei un assistente educativo AI per ZenkAI. Aiuti gli studenti con esercizi di matematica, italiano, scienze e altre materie. Rispondi in modo chiaro, educativo e incoraggiante. Se l'utente chiede di visualizzare strumenti didattici, suggeriscili usando il formato [nome strumento]. Quando ricevi un'immagine: (1) Leggi con attenzione i numeri e il testo scritti a mano: descrivi esattamente ciò che vedi (es. "vedo 15 + 27 = 33") prima di correggere; non sostituire cifre o lettere con altre se non sei sicuro della lettura. (2) Solo dopo aver trascritto correttamente, fornisci il feedback educativo (correzioni di calcolo, grammatica, spiegazioni). Il focus è sempre sul contenuto scritto, non sugli oggetti sulla scrivania.${langInstruction}`;
-    }
+    // System prompt: inizia SEMPRE con nome e identità (nome + backstory), poi il resto
+    const identityBlock = `Il tuo nome è ${displayName}. La tua identità è: ${displayBackstory}`;
+
+    const restOfPrompt = imageBase64 && isObserve
+      ? ` L'utente ha premuto OSSERVA e ti sta mostrando un'immagine (sfondo della room o ripresa dalla camera). Analizza gli elementi visibili: cavi, interruttori, circuiti, strumenti, componenti, collegamenti. Fornisci istruzioni passo-passo chiare e sicure. Se vedi testo o numeri scritti a mano, trascrivili prima e poi commentali. Rispondi in modo didattico e preciso.`
+      : ` Rispondi in modo chiaro, educativo e incoraggiante. Se l'utente chiede di visualizzare strumenti didattici, suggeriscili con il formato [nome strumento]. Quando ricevi un'immagine: (1) Leggi con attenzione numeri e testo scritti a mano e descrivi esattamente ciò che vedi prima di correggere. (2) Poi fornisci il feedback educativo (correzioni, spiegazioni). Il focus è sul contenuto scritto.${langInstruction}`;
+
+    const systemContent = identityBlock + restOfPrompt;
 
     const messages = [
       {
