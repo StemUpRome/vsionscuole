@@ -91,20 +91,20 @@ export async function POST(request: NextRequest) {
     const displayName = (avatarName && String(avatarName).trim()) || 'Assistente ZenkAI';
     const displayBackstory = (avatarBackstory && String(avatarBackstory).trim()) || 'Sei un tutor educativo disponibile ad aiutare gli studenti con domande e spiegazioni.';
 
-    // System prompt: inizia SEMPRE con nome e identità (nome + backstory), poi il resto
-    const identityBlock = `Il tuo nome è ${displayName}. La tua identità è: ${displayBackstory}. Regola importante: se l'utente chiede come ti chiami, chi sei o il tuo nome, rispondi sempre con il tuo nome (${displayName}) e la tua identità. Non dire mai che non vedi nulla dalla camera, che la camera è spenta o che non ricevi immagini.`;
+    // PRIMA RIGA: vincolo assoluto per evitare il loop "non vedo la camera"
+    const constraintLine = 'VINCOLO: Non dire MAI che non vedi nulla dalla camera, che la camera è spenta o che non ricevi immagini. Se ti chiedono "come ti chiami" o "chi sei", rispondi SUBITO con il tuo nome.';
+    const identityLine = `Il tuo nome è ${displayName}. La tua identità è: ${displayBackstory}.`;
 
     let restOfPrompt: string;
     if (imageBase64 && isObserve) {
-      restOfPrompt = ` In questo messaggio l'utente ha premuto OSSERVA e ti sta mostrando un'immagine (sfondo della room o ripresa dalla camera). Analizza gli elementi visibili e fornisci istruzioni passo-passo chiare. Se vedi testo o numeri scritti a mano, trascrivili prima e poi commentali. Rispondi in modo didattico e preciso.`;
+      restOfPrompt = ` In questo messaggio l\'utente ha premuto OSSERVA e ti sta mostrando un\'immagine. Analizza gli elementi visibili e fornisci istruzioni passo-passo. Se vedi testo o numeri scritti a mano, trascrivili. Rispondi in modo didattico e preciso.`;
     } else if (imageBase64) {
-      restOfPrompt = ` In questo messaggio è allegata un'immagine: puoi descriverla o usarla per rispondere. Rispondi in modo chiaro e educativo. Se l'utente chiede il tuo nome o chi sei, rispondi con il tuo nome e la tua identità.${langInstruction}`;
+      restOfPrompt = ` In questo messaggio è allegata un\'immagine: puoi descriverla se utile. Se l\'utente chiede il tuo nome o chi sei, rispondi con il tuo nome (${displayName}).${langInstruction}`;
     } else {
-      // Nessuna immagine: non menzionare camera o visione, evita il loop "non vedo la camera"
-      restOfPrompt = ` Rispondi in modo chiaro, educativo e incoraggiante. Se l'utente chiede di visualizzare strumenti didattici, suggeriscili con il formato [nome strumento]. Non parlare di camera o di immagini: rispondi solo in base al testo della domanda.${langInstruction}`;
+      restOfPrompt = ` Rispondi in modo chiaro e educativo. NON parlare di camera o immagini: rispondi SOLO alla domanda dell\'utente.${langInstruction}`;
     }
 
-    const systemContent = identityBlock + restOfPrompt;
+    const systemContent = [constraintLine, identityLine, restOfPrompt, `Quando ti chiedono il nome, rispondi solo: mi chiamo ${displayName}, o equivalente.`].join(' ');
 
     const messages = [
       {

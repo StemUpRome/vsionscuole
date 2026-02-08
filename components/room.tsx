@@ -1994,14 +1994,18 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
 
       try {
           // In modalità avatar l'avatar deve sempre "vedere": usa sfondo caricato se c'è, altrimenti frame camera.
-          // Per OSSERVA o per qualsiasi messaggio (es. "cosa vedi?") inviamo l'immagine corrente.
           let imageBase64: string | null = null;
           const isObserveMessage = message.trim() === OSSERVA_MESSAGE;
+          const lowerMsg = message.trim().toLowerCase();
+          const isIdentityQuestion = /come ti chiami|chi sei|qual è il tuo nome|il tuo nome|what'?s your name|your name/i.test(lowerMsg) || lowerMsg === 'come ti chiami' || lowerMsg === 'chi sei';
 
-          if (customBackgroundImage && customBackgroundImage.startsWith('data:image/') && (isObserveMessage || hasAvatarMode)) {
+          // Per domande su nome/identità non inviare immagine: così il modello risponde solo con nome/identità e non parla di camera
+          if (hasAvatarMode && isIdentityQuestion) {
+              imageBase64 = null;
+          } else if (customBackgroundImage && customBackgroundImage.startsWith('data:image/') && (isObserveMessage || hasAvatarMode)) {
               imageBase64 = customBackgroundImage;
           }
-          if (!imageBase64 && (isObserveMessage || !hasAvatarMode || hasAvatarMode)) {
+          if (!imageBase64 && !isIdentityQuestion && (isObserveMessage || !hasAvatarMode || hasAvatarMode)) {
               if (!isCameraPaused && videoRef.current && videoRef.current.readyState >= 2) {
               const vid = videoRef.current;
               const videoWidth = vid.videoWidth || vid.clientWidth || 1920;
