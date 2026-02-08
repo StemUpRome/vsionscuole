@@ -27,7 +27,7 @@ import type { ContextualFlashcard } from '../dai/flashcards/generateFlashcards';
 import { shouldAutoTightROI, estimateTextBboxFromCanvas } from '../dai/roiTightening';
 import type { ConfirmationState } from '../dai/confidenceGate';
 import { shouldIntervene, formatInterventionMessage, detectDoubtReasons, hashText, fingerprintSnapshot, type Intervention, type DoubtReason, type SnapshotAnalysis } from '../dai/autoIntervention';
-import { speak as speakTTS, stopSpeaking, isCurrentlySpeaking } from '../tts/ttsClient';
+import { speak as speakTTS, stopSpeaking, isCurrentlySpeaking, type TTSVoice } from '../tts/ttsClient';
 import { filterMeaningfulEvents } from '../dai/meaningfulEvents';
 // Convai rimosso: risposta vocale tramite Web Speech API (speakTTS)
 // import { createConvaiClient } from '../lib/convai/convaiClient';
@@ -2128,8 +2128,8 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
           setHistory(prev => [...prev, aiMessage]);
           if (hasAvatarMode && aiText) {
             setIsAiSpeaking(true);
-            const voice = avatarDisplayData?.voice ?? (/tesla/i.test(avatarDisplayData?.name ?? '') ? 'onyx' : 'nova');
-            speakTTS(aiText, { voice, onEnd: () => setIsAiSpeaking(false) });
+            const rawVoice = avatarDisplayData?.voice ?? (/tesla/i.test(avatarDisplayData?.name ?? '') ? 'onyx' : 'nova');
+            speakTTS(aiText, { voice: rawVoice as TTSVoice, onEnd: () => setIsAiSpeaking(false) });
           }
       } catch (error) {
           console.error('Errore nella chat AI:', error);
