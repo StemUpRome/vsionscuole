@@ -60,7 +60,7 @@ function NewAvatarContent() {
   const [step, setStep] = useState(1)
   const [name, setName] = useState('Irene')
   const [language, setLanguage] = useState('en')
-  const [voice, setVoice] = useState(VOICES[0])
+  const [voice, setVoice] = useState<string>(VOICES[0].value)
   const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_IMAGES[0])
   const [imageSourceMode, setImageSourceMode] = useState<'gallery' | 'upload' | 'prompt'>('gallery')
   const [imagePrompt, setImagePrompt] = useState('')
