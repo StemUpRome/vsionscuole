@@ -203,7 +203,12 @@ export async function POST(request: NextRequest) {
     if (askMap || askTimeline) {
       const topic = message.trim().slice(0, 200);
       const toolPrompt = askMap
-        ? `L'utente vuole una mappa concettuale. Argomento: "${topic}". Rispondi SOLO con un JSON valido, nessun altro testo. Formato: {"main": "Titolo principale", "nodes": [{"title": "Concetto 1", "detail": "breve descrizione"}, {"title": "Concetto 2", "detail": "breve descrizione"}, ...]}. Includi 4-8 nodi.`
+        ? `L'utente vuole una mappa concettuale (visuale BES). Argomento: "${topic}". 
+Scrivi SOLO testo semplice su più righe, senza JSON, senza elenco puntato e senza spiegazioni aggiuntive.
+Formato esatto:
+- Prima riga: il titolo principale della mappa (es. "Fotosintesi clorofilliana").
+- Dalla seconda riga in poi: una riga per ogni concetto collegato, testo completo in italiano (es. "Le piante usano la luce per trasformare acqua e anidride carbonica in zuccheri").
+Niente numeri all'inizio riga, niente trattini, niente punti elenco, niente testo prima o dopo la lista.`
         : `L'utente vuole una timeline o cronologia. Argomento: "${topic}". Rispondi SOLO con un elenco numerato di eventi, una riga per evento. Formato: "1. ANNO - Descrizione evento. 2. ANNO - Descrizione. ...". Usa anni reali (4 cifre). 5-10 eventi. Nessun altro testo.`;
 
       try {
