@@ -2160,6 +2160,20 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
             const rawVoice = avatarDisplayData?.voice ?? (/tesla/i.test(avatarDisplayData?.name ?? '') ? 'onyx' : 'nova');
             speakTTS(aiText, { voice: rawVoice as TTSVoice, onEnd: () => setIsAiSpeaking(false) });
           }
+          // Connetti strumenti di supporto (Mappa Concettuale, Timeline): apri lo strumento con il contenuto generato da GPT
+          const suggestedTool = data.suggestedTool as 'concept_map' | 'history_timeline' | undefined;
+          const toolContent = typeof data.toolContent === 'string' ? data.toolContent : undefined;
+          if (suggestedTool && (suggestedTool === 'concept_map' || suggestedTool === 'history_timeline') && toolContent) {
+            setSupportToolsExpanded(true);
+            setUi(prev => ({
+              ...prev,
+              ar_overlay: {
+                ...prev.ar_overlay,
+                tool_active: suggestedTool,
+                tool_content: toolContent,
+              },
+            }));
+          }
       } catch (error) {
           console.error('Errore nella chat AI:', error);
           let text = error instanceof Error ? error.message : 'Errore di connessione. Riprova.';
@@ -2712,7 +2726,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                   <img
                     src={avatarDisplayData.image}
                     alt={avatarDisplayData.name}
-                    className={`w-full h-full object-cover object-bottom pointer-events-none block ${isAiSpeaking ? 'avatar-speaking-lips' : ''}`}
+                    className="w-full h-full object-cover object-bottom pointer-events-none block"
                     draggable={false}
                   />
                 </div>

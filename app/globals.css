@@ -196,18 +196,3 @@ input[type="range"]::-moz-range-thumb {
 .animate-shine {
   animation: shine 2s infinite;
 }
-
-/* Avatar speaking: movimento molto lieve (quasi impercettibile) per evitare effetto saltellante */
-@keyframes avatar-lip-sync {
-  0%, 100% {
-    transform: scaleY(1);
-  }
-  50% {
-    transform: scaleY(1.006);
-  }
-}
-
-.avatar-speaking-lips {
-  transform-origin: center bottom;
-  animation: avatar-lip-sync 1.2s ease-in-out infinite;
-}

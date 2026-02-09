@@ -192,8 +192,50 @@ export async function POST(request: NextRequest) {
     const data = await response.json();
     const aiMessage = data.choices[0]?.message?.content || 'Nessuna risposta disponibile';
 
+    // Rileva richiesta mappa concettuale o timeline/timesheet e genera contenuto per lo strumento
+    const lowerMsg = message.trim().toLowerCase();
+    const askMap = /\b(mappa\s+concettuale|concept\s+map|mappa\s+mentale|diagramma\s+concettuale|crea\s+una\s+mappa)\b/i.test(lowerMsg);
+    const askTimeline = /\b(timeline|timesheet|cronologia|linea\s+del\s+tempo|eventi\s+in\s+ordine|date\s+importanti)\b/i.test(lowerMsg);
+
+    let suggestedTool: 'concept_map' | 'history_timeline' | null = null;
+    let toolContent: string | null = null;
+
+    if (askMap || askTimeline) {
+      const topic = message.trim().slice(0, 200);
+      const toolPrompt = askMap
+        ? `L'utente vuole una mappa concettuale. Argomento: "${topic}". Rispondi SOLO con un JSON valido, nessun altro testo. Formato: {"main": "Titolo principale", "nodes": [{"title": "Concetto 1", "detail": "breve descrizione"}, {"title": "Concetto 2", "detail": "breve descrizione"}, ...]}. Includi 4-8 nodi.`
+        : `L'utente vuole una timeline o cronologia. Argomento: "${topic}". Rispondi SOLO con un elenco numerato di eventi, una riga per evento. Formato: "1. ANNO - Descrizione evento. 2. ANNO - Descrizione. ...". Usa anni reali (4 cifre). 5-10 eventi. Nessun altro testo.`;
+
+      try {
+        const toolRes = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: 'Rispondi solo con il contenuto richiesto, senza spiegazioni o prefissi.' },
+              { role: 'user', content: toolPrompt },
+            ],
+            temperature: 0.4,
+            max_tokens: 800,
+          }),
+        });
+        if (toolRes.ok) {
+          const toolData = await toolRes.json();
+          const raw = toolData.choices?.[0]?.message?.content?.trim() || '';
+          if (raw) {
+            suggestedTool = askMap ? 'concept_map' : 'history_timeline';
+            toolContent = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+          }
+        }
+      } catch (e) {
+        console.warn('[Chat API] Tool content generation failed:', e);
+      }
+    }
+
     return NextResponse.json({
-      message: aiMessage
+      message: aiMessage,
+      ...(suggestedTool && toolContent ? { suggestedTool, toolContent } : {}),
     });
 
   } catch (error) {
