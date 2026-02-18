@@ -13,7 +13,7 @@ function QuizCompletedContent() {
   return (
     <div className="min-h-screen bg-[#1A1A1A] text-white flex flex-col">
       <header className="p-6 border-b border-[#2C2C2E]">
-        <Link href="/dashboard" className="flex items-center gap-3">
+        <Link href="/avatars" className="flex items-center gap-3">
           <div className="w-10 h-10 bg-[#6B48FF] rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-xl">Z</span>
           </div>

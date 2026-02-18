@@ -41,12 +41,12 @@ export default function QuizSummaryPage() {
   const isMultiple = currentIndex === 2 || currentIndex === 5 || currentIndex === 8
   const isTrueFalse = currentIndex === 0 || currentIndex === 3 || currentIndex === 6 || currentIndex === 9
 
-  const handleFinish = () => router.push('/dashboard')
+  const handleFinish = () => router.push('/avatars')
 
   return (
     <div className="min-h-screen bg-[#1A1A1A] text-white flex">
       <header className="absolute top-0 left-0 right-0 flex items-center p-6 border-b border-[#2C2C2E] z-10">
-        <Link href="/dashboard" className="flex items-center gap-3">
+        <Link href="/avatars" className="flex items-center gap-3">
           <div className="w-10 h-10 bg-[#6B48FF] rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-xl">Z</span>
           </div>

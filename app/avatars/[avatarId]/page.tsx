@@ -55,20 +55,21 @@ export default function AvatarWorkAreaPage() {
     )
   }
 
+  const accent = 'from-violet-500 to-blue-600'
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#09090b]">
-      {/* Barra: avatar + "Entra in Room" per vedere l'avatar parlante nella Room */}
-      <header className="flex-shrink-0 flex items-center justify-between gap-4 px-4 py-3 bg-[#18181b] border-b border-white/10">
-        <Link href="/dashboard" className="flex items-center gap-2 text-[#A0A0A0] hover:text-white text-sm transition-colors">
+    <div className="min-h-screen flex flex-col bg-slate-950">
+      <header className="flex-shrink-0 flex items-center justify-between gap-4 px-4 py-3 bg-slate-900/80 border-b border-violet-500/20">
+        <Link href="/dashboard" className="flex items-center gap-2 text-slate-400 hover:text-white text-sm transition-colors">
           <span aria-hidden>←</span>
-          <span>Dashboard</span>
+          <span>I tuoi avatar</span>
         </Link>
         <div className="flex items-center gap-3">
           {avatar.image && (
             <img
               src={avatar.image}
               alt=""
-              className="w-10 h-10 rounded-xl object-cover border-2 border-[#6366F1]/50"
+              className="w-10 h-10 rounded-xl object-cover border-2 border-violet-500/50"
             />
           )}
           <span className="font-semibold text-white">{avatar.name}</span>
@@ -76,7 +77,7 @@ export default function AvatarWorkAreaPage() {
         <button
           type="button"
           onClick={() => router.push(`/room/legacy?avatarId=${encodeURIComponent(avatarId)}`)}
-          className="px-4 py-2 rounded-xl bg-[#6B48FF] hover:bg-[#5A3FE6] text-white text-sm font-bold transition-colors shadow-lg shadow-[#6B48FF]/30"
+          className={`px-4 py-2 rounded-xl bg-gradient-to-r ${accent} hover:opacity-95 text-white text-sm font-bold transition-opacity shadow-lg shadow-violet-500/25`}
         >
           Entra in Room
         </button>

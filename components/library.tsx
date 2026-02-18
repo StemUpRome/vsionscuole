@@ -28,7 +28,7 @@ export default function Library() {
       {/* Header */}
       <header className="max-w-4xl mx-auto mb-8">
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/dashboard')}>
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/avatars')}>
             <div className="w-10 h-10 rounded-full bg-[#2D2E30] flex items-center justify-center text-white font-bold border border-[#3C4043]">←</div>
             <h1 className="text-2xl font-medium text-white">Studio & Quiz</h1>
           </div>

@@ -42,7 +42,7 @@ export default function Checkout() {
       addActivity('Nuovo Cliente', `Ha acquistato piano ${selectedPlan.name} (${isAnnual ? 'Annuale' : 'Mensile'})`, 'payment');
 
       setIsLoading(false);
-      router.push('/dashboard');
+      router.push('/avatars');
     }, 2000);
   };
 

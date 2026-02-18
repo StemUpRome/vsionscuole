@@ -755,7 +755,7 @@ export default function WorkArea({ avatarId, avatarName }: WorkAreaProps) {
           {!sidebarCollapsed || isMobile ? (
             <>
               <button
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push('/avatars')}
                 className="relative hover:opacity-80 transition-opacity"
                 title="Torna alla home"
               >

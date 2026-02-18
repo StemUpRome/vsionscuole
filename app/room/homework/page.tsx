@@ -215,7 +215,7 @@ export default function RoomHomeworkPage() {
       {/* Left Sidebar */}
       <aside className="w-64 bg-[#18181b] border-r border-white/10 flex flex-col">
         <div className="p-6 border-b border-white/10">
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link href="/avatars" className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gradient-to-r from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">V</span>
             </div>

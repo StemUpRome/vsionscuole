@@ -19,7 +19,7 @@ export default function ForgotPassword() {
       
       {/* Navbar Minimal */}
       <nav className="absolute top-0 left-0 w-full p-6 flex justify-between items-center z-20">
-        <div className="flex items-center gap-3 cursor-pointer opacity-80 hover:opacity-100 transition" onClick={() => router.push('/dashboard')}>
+        <div className="flex items-center gap-3 cursor-pointer opacity-80 hover:opacity-100 transition" onClick={() => router.push('/avatars')}>
           <div className="w-8 h-8 rounded-full bg-[#2D2E30] flex items-center justify-center text-white text-xs font-bold border border-[#3C4043]">←</div>
           <span className="text-sm font-medium text-gray-400">Torna al Login</span>
         </div>
@@ -68,7 +68,7 @@ export default function ForgotPassword() {
               </p>
               
               <button 
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push('/avatars')}
                 className="w-full bg-[#2D2E30] border border-[#3C4043] text-white py-3 rounded-full font-bold hover:bg-[#3C4043] transition-all"
               >
                 Torna al Login

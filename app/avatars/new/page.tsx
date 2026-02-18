@@ -6,17 +6,16 @@ import Link from 'next/link'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts'
 
 const STEPS = 3
-const STEP_NAMES = ['Identity', 'Knowledge', 'Behaviour'] as const
+const STEP_NAMES = ['Identità', 'Conoscenze', 'Comportamento'] as const
 
-const AVATAR_IMAGES = Array.from({ length: 16 }, (_, i) => `/avatar-${i + 1}.png`)
-const THUMBNAILS = AVATAR_IMAGES.slice(0, 6)
+const AVATAR_IMAGES_FALLBACK = Array.from({ length: 16 }, (_, i) => `/avatar-${i + 1}.png`)
 
 const LANGUAGES = [
-  { value: 'en', label: 'English' },
-  { value: 'it', label: 'Italian' },
-  { value: 'es', label: 'Spanish' },
-  { value: 'fr', label: 'French' },
-  { value: 'de', label: 'German' },
+  { value: 'it', label: 'Italiano' },
+  { value: 'en', label: 'Inglese' },
+  { value: 'es', label: 'Spagnolo' },
+  { value: 'fr', label: 'Francese' },
+  { value: 'de', label: 'Tedesco' },
 ]
 
 // Voci OpenAI TTS (tts-1): usate per /api/tts in Room
@@ -61,11 +60,11 @@ function NewAvatarContent() {
   const [name, setName] = useState('Irene')
   const [language, setLanguage] = useState('en')
   const [voice, setVoice] = useState<string>(VOICES[0].value)
-  const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_IMAGES[0])
+  const [avatarImages, setAvatarImages] = useState<string[]>(AVATAR_IMAGES_FALLBACK)
+  const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_IMAGES_FALLBACK[0])
   const [imageSourceMode, setImageSourceMode] = useState<'gallery' | 'upload' | 'prompt'>('gallery')
   const [imagePrompt, setImagePrompt] = useState('')
   const [isGeneratingImage, setIsGeneratingImage] = useState(false)
-  const [convaiCharacterId, setConvaiCharacterId] = useState('')
 
   const [description, setDescription] = useState('')
   const [descriptionCharLimit] = useState(2000)
@@ -81,6 +80,21 @@ function NewAvatarContent() {
     neuroticism: 25,
   })
 
+  // Carica tutti gli avatar dalla cartella public (API legge la directory)
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/avatar-images')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled && Array.isArray(data?.images) && data.images.length > 0) {
+          setAvatarImages(data.images)
+          setSelectedAvatar((prev) => (data.images.includes(prev) ? prev : data.images[0]))
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
   useEffect(() => {
     if (typeof window === 'undefined' || !editId) return
     try {
@@ -91,11 +105,10 @@ function NewAvatarContent() {
         setName(found.name ?? 'Irene')
         setLanguage(Array.isArray(found.languages) ? (found.languages[0] || 'en') : 'en')
         setVoice(typeof found.voice === 'string' && VOICES.some((v) => v.value === found.voice) ? found.voice : VOICES[0].value)
-        setSelectedAvatar(found.image ?? AVATAR_IMAGES[0])
+        setSelectedAvatar(found.image ?? AVATAR_IMAGES_FALLBACK[0])
         setDescription(found.description ?? '')
         setKnowledgeFiles(Array.isArray(found.knowledgeFiles) ? found.knowledgeFiles : [])
         setAiModel(found.aiModel ?? 'gpt-5')
-        setConvaiCharacterId(found.convaiCharacterId ?? '')
         if (found.personality && typeof found.personality === 'object') {
           setPersonality({
             openness: Number(found.personality.openness) || 30,
@@ -196,7 +209,7 @@ function NewAvatarContent() {
       if (data.description) setDescription(data.description.slice(0, descriptionCharLimit))
     } catch (err) {
       console.error(err)
-      alert(err instanceof Error ? err.message : 'Impossibile generare la backstory. Riprova.')
+      alert(err instanceof Error ? err.message : 'Impossibile generare la storia del personaggio. Riprova.')
     } finally {
       setIsGeneratingDescription(false)
     }
@@ -214,7 +227,6 @@ function NewAvatarContent() {
       knowledgeFiles,
       aiModel,
       personality,
-      convaiCharacterId: convaiCharacterId.trim() || undefined,
       createdAt: (editId ? undefined : new Date().toISOString()) as string | undefined,
     }
     try {
@@ -244,233 +256,252 @@ function NewAvatarContent() {
     if (s >= 1 && s <= STEPS) setStep(s)
   }
 
+  const accent = 'from-violet-500 to-blue-600'
+  const cyan = 'from-cyan-400 to-blue-500'
+
   return (
-    <div className="min-h-screen bg-[#1A1A1A] text-white flex">
-      {/* Left Sidebar */}
-      <aside className="w-64 border-r border-[#2C2C2E] flex flex-col flex-shrink-0">
-        <div className="p-6 border-b border-[#2C2C2E]">
-          <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
-            <div className="w-10 h-10 bg-[#6B48FF] rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">Z</span>
+    <div className="min-h-screen h-dvh bg-slate-950 text-white flex flex-col">
+      {/* Header unico stile VERSE / gaming */}
+      <header className="flex-shrink-0 sticky top-0 z-30 bg-slate-950/90 backdrop-blur-md border-b border-violet-500/20">
+        <div className="flex items-center justify-between gap-4 px-4 sm:px-6 lg:px-8 py-3">
+          <Link href="/" className="flex items-center gap-3 shrink-0 group">
+            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${accent} flex items-center justify-center shadow-lg shadow-violet-500/30 group-hover:shadow-violet-500/50 transition-shadow`}>
+              <span className="text-white font-bold text-xl">V</span>
             </div>
-            <span className="text-white font-semibold text-lg">ZenkAI</span>
+            <span className="text-white font-semibold text-lg hidden sm:inline">VERSE WEB</span>
           </Link>
-        </div>
-        <nav className="flex-1 p-4 space-y-1">
-          {STEP_NAMES.map((label, i) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => goToStep(i + 1)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all ${
-                step === i + 1
-                  ? 'bg-[#6B48FF] text-white'
-                  : 'text-[#A0A0A0] hover:bg-[#2C2C2E]'
-              }`}
-            >
-              {label === 'Identity' && (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              )}
-              {label === 'Knowledge' && (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-              )}
-              {label === 'Behaviour' && (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-              )}
-              <span className="font-medium">{label}</span>
-            </button>
-          ))}
-        </nav>
-        <div className="p-4 border-t border-[#2C2C2E]">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2 text-[#A0A0A0] hover:text-white text-sm transition-colors"
-          >
-            <span>←</span>
-            <span>Back to Homepage</span>
-          </Link>
-        </div>
-      </aside>
 
-      {/* Main content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Breadcrumbs + Title */}
-        <div className="p-6 pb-4 border-b border-[#2C2C2E]">
-          <div className="flex items-center gap-2 text-sm mb-2">
-            <Link href="/avatars" className="text-[#6B48FF] hover:underline">
-              {editId ? 'Modifica avatar' : 'Create avatar'}
-            </Link>
-            <span className="text-[#A0A0A0]">›</span>
-            <span className="text-white">{STEP_NAMES[step - 1]}</span>
+          {/* Step indicator: livelli gioco */}
+          <div className="flex items-center gap-1 sm:gap-2">
+            {STEP_NAMES.map((label, i) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => goToStep(i + 1)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                  step === i + 1
+                    ? `bg-gradient-to-r ${accent} text-white shadow-lg shadow-violet-500/25 scale-105`
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/80 border border-violet-500/20'
+                }`}
+              >
+                <span className="hidden sm:inline">Liv.{i + 1}</span>
+                <span className="sm:hidden">{i + 1}</span>
+                <span className="hidden md:inline">{label}</span>
+              </button>
+            ))}
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold text-white">
-            {editId
-              ? (step === 1 && 'Modifica identità e immagine')
-              || (step === 2 && 'Modifica conoscenze')
-              || (step === 3 && 'Modifica comportamento')
-              : (step === 1 && 'Create your avatar')
-              || (step === 2 && 'Define what your avatar knows')
-              || (step === 3 && 'Define how your avatar behaves')}
-          </h1>
-          <p className="text-[#A0A0A0] mt-1">Step {step} of {STEPS}</p>
-        </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
-          {/* Step 1 - Identity */}
+          <Link
+            href="/avatars"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/80 border border-transparent hover:border-violet-500/20 text-sm font-medium transition-all"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            <span className="hidden sm:inline">Torna agli avatar</span>
+          </Link>
+        </div>
+      </header>
+
+      <main className="flex-1 flex flex-col overflow-hidden min-h-0">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          {/* Step 1 - Identity: UI gaming / education */}
           {step === 1 && (
-            <div className="flex flex-col lg:flex-row gap-8 max-w-5xl">
-              <div className="flex flex-col">
-                <div className="aspect-[3/4] max-w-sm rounded-2xl overflow-hidden bg-[#2C2C2E] mb-4 border border-[#2C2C2E]">
-                  <img
-                    src={selectedAvatar}
-                    alt="Avatar"
-                    className="w-full h-full object-cover object-top"
-                  />
-                </div>
-                <p className="text-xs text-[#A0A0A0] mb-2">Anteprima: questa immagine apparirà nella Room.</p>
-                <div className="flex rounded-xl bg-[#2C2C2E] p-1 mb-3">
-                  <button
-                    type="button"
-                    onClick={() => setImageSourceMode('gallery')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      imageSourceMode === 'gallery' ? 'bg-[#6B48FF] text-white' : 'text-[#A0A0A0] hover:text-white'
-                    }`}
-                  >
-                    Galleria
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setImageSourceMode('upload')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      imageSourceMode === 'upload' ? 'bg-[#6B48FF] text-white' : 'text-[#A0A0A0] hover:text-white'
-                    }`}
-                  >
-                    Carica
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setImageSourceMode('prompt')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      imageSourceMode === 'prompt' ? 'bg-[#6B48FF] text-white' : 'text-[#A0A0A0] hover:text-white'
-                    }`}
-                  >
-                    Genera
-                  </button>
-                </div>
-                {imageSourceMode === 'gallery' && (
-                  <div className="grid grid-cols-6 gap-2">
-                    {THUMBNAILS.map((src) => (
-                      <button
-                        key={src}
-                        type="button"
-                        onClick={() => setSelectedAvatar(src)}
-                        className={`aspect-square rounded-xl overflow-hidden border-2 transition-colors ${
-                          selectedAvatar === src ? 'border-[#6B48FF]' : 'border-[#2C2C2E] hover:border-[#333335]'
-                        }`}
-                      >
-                        <img src={src} alt="" className="w-full h-full object-cover" />
-                      </button>
-                    ))}
+            <div className="max-w-5xl mx-auto">
+              <div className="mb-6 sm:mb-8">
+                <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-violet-500/20 text-violet-300 border border-violet-500/30 mb-2">
+                  Livello 1 — Identità
+                </span>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+                  {editId ? 'Modifica identità e immagine' : 'Disegna il tuo personaggio'}
+                </h1>
+                <p className="text-slate-400 text-sm sm:text-base">Scegli il volto del tuo tutor e il suo nome.</p>
+              </div>
+
+              <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+                {/* Colonna sinistra: ritratto + sorgente immagine */}
+                <div className="lg:w-[380px] flex-shrink-0 space-y-4">
+                  {/* Cornice ritratto stile "character card" */}
+                  <div className="relative rounded-2xl overflow-hidden bg-slate-900/80 border-2 border-violet-500/30 shadow-xl shadow-violet-500/10 ring-2 ring-inset ring-white/5">
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent pointer-events-none z-10" />
+                    <div className="aspect-[3/4] max-h-[420px]">
+                      <img
+                        src={selectedAvatar}
+                        alt="Avatar"
+                        className="w-full h-full object-cover object-top"
+                      />
+                    </div>
+                    <div className="absolute bottom-3 left-3 right-3 z-20 flex items-center gap-2">
+                      <span className="px-2 py-1 rounded-lg bg-slate-900/90 text-slate-300 text-xs font-medium border border-violet-500/20">
+                        Anteprima Room
+                      </span>
+                    </div>
                   </div>
-                )}
-                {imageSourceMode === 'upload' && (
-                  <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#2C2C2E] hover:border-[#6B48FF]/50 bg-[#2C2C2E]/50 p-6 cursor-pointer transition-colors">
-                    <svg className="w-10 h-10 text-[#A0A0A0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span className="text-sm text-[#A0A0A0] text-center">Clicca o trascina un&apos;immagine</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleImageUpload}
-                    />
-                  </label>
-                )}
-                {imageSourceMode === 'prompt' && (
-                  <div className="space-y-2">
-                    <textarea
-                      value={imagePrompt}
-                      onChange={(e) => setImagePrompt(e.target.value)}
-                      placeholder="Es: ritratto di un tutor amichevole, stile illustrazione, sfondo neutro"
-                      rows={3}
-                      className="w-full px-4 py-3 bg-[#2C2C2E] border border-[#2C2C2E] rounded-xl text-white placeholder-[#A0A0A0] focus:outline-none focus:border-[#6B48FF] resize-none text-sm"
-                    />
+
+                  {/* Tab Galleria / Carica / Genera — stile pulsanti gioco */}
+                  <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
-                      onClick={handleGenerateFromPrompt}
-                      disabled={!imagePrompt.trim() || isGeneratingImage}
-                      className="w-full py-3 bg-[#6B48FF] text-white rounded-xl font-medium hover:bg-[#5A3FE6] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      onClick={() => setImageSourceMode('gallery')}
+                      className={`flex flex-col items-center gap-2 py-3 px-2 rounded-xl border-2 transition-all duration-200 ${
+                        imageSourceMode === 'gallery'
+                          ? 'border-violet-500 bg-violet-500/20 text-white shadow-lg shadow-violet-500/20'
+                          : 'border-slate-700 bg-slate-800/60 text-slate-400 hover:border-violet-500/40 hover:text-white'
+                      }`}
                     >
-                      {isGeneratingImage ? 'Generazione in corso...' : 'Genera immagine'}
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                      </svg>
+                      <span className="text-xs font-semibold">Galleria</span>
                     </button>
-                    <p className="text-[10px] text-[#818CF8] mt-1">
-                      Usa la chiave OpenAI (DALL-E): imposta <code className="bg-[#2C2C2E] px-1 rounded">OPENAI_API_KEY</code> in .env.local o in Netlify → Environment variables.
-                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setImageSourceMode('upload')}
+                      className={`flex flex-col items-center gap-2 py-3 px-2 rounded-xl border-2 transition-all duration-200 ${
+                        imageSourceMode === 'upload'
+                          ? 'border-cyan-500 bg-cyan-500/20 text-cyan-200 shadow-lg shadow-cyan-500/20'
+                          : 'border-slate-700 bg-slate-800/60 text-slate-400 hover:border-cyan-500/40 hover:text-white'
+                      }`}
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <span className="text-xs font-semibold">Carica</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImageSourceMode('prompt')}
+                      className={`flex flex-col items-center gap-2 py-3 px-2 rounded-xl border-2 transition-all duration-200 ${
+                        imageSourceMode === 'prompt'
+                          ? 'border-amber-500/80 bg-amber-500/20 text-amber-200 shadow-lg shadow-amber-500/20'
+                          : 'border-slate-700 bg-slate-800/60 text-slate-400 hover:border-amber-500/40 hover:text-white'
+                      }`}
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      <span className="text-xs font-semibold">Genera</span>
+                    </button>
                   </div>
-                )}
-              </div>
-              <div className="flex-1 space-y-6 min-w-[280px] sm:min-w-[320px]">
-                <div>
-                  <label className="block text-sm font-medium text-white mb-2">Name</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full min-w-0 px-4 py-3 bg-[#2C2C2E] border border-[#2C2C2E] rounded-xl text-white placeholder-[#A0A0A0] focus:outline-none focus:border-[#6B48FF] text-base"
-                    placeholder="Avatar name"
-                  />
+
+                  {/* Contenuto per modalità selezionata */}
+                  {imageSourceMode === 'gallery' && (
+                    <div className="rounded-xl bg-slate-800/60 border border-violet-500/20 p-3">
+                      <p className="text-xs text-slate-400 mb-3">Scegli un volto dalla galleria</p>
+                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                        {avatarImages.map((src) => (
+                          <button
+                            key={src}
+                            type="button"
+                            onClick={() => setSelectedAvatar(src)}
+                            className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                              selectedAvatar === src
+                                ? 'border-violet-500 ring-2 ring-violet-500/50 scale-105'
+                                : 'border-slate-600 hover:border-violet-500/50'
+                            }`}
+                          >
+                            <img src={src} alt="" className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {imageSourceMode === 'upload' && (
+                    <label className="block rounded-xl border-2 border-dashed border-cyan-500/40 bg-slate-800/40 hover:bg-slate-800/70 hover:border-cyan-500/60 p-6 cursor-pointer transition-all group">
+                      <div className="flex flex-col items-center justify-center gap-3 text-center">
+                        <div className="w-14 h-14 rounded-xl bg-cyan-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <svg className="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-white">Trascina qui un&apos;immagine</p>
+                          <p className="text-xs text-slate-400 mt-0.5">oppure clicca per scegliere</p>
+                        </div>
+                      </div>
+                      <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                    </label>
+                  )}
+                  {imageSourceMode === 'prompt' && (
+                    <div className="rounded-xl bg-slate-800/60 border border-amber-500/30 p-4 space-y-3">
+                      <p className="text-xs text-slate-400">Descrivi il personaggio: l&apos;AI lo disegnerà per te.</p>
+                      <textarea
+                        value={imagePrompt}
+                        onChange={(e) => setImagePrompt(e.target.value)}
+                        placeholder="Es: ritratto di un tutor amichevole, stile illustrazione educativa, sfondo neutro"
+                        rows={3}
+                        className="w-full px-4 py-3 bg-slate-900/80 border border-amber-500/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50 resize-none text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleGenerateFromPrompt}
+                        disabled={!imagePrompt.trim() || isGeneratingImage}
+                        className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${
+                          isGeneratingImage || !imagePrompt.trim()
+                            ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                            : `bg-gradient-to-r ${cyan} text-white hover:opacity-95 shadow-lg shadow-cyan-500/25`
+                        }`}
+                      >
+                        {isGeneratingImage ? '⏳ Generazione in corso...' : '✨ Genera con AI'}
+                      </button>
+                      <p className="text-[10px] text-slate-500">
+                        Richiede <code className="bg-slate-800 px-1 rounded">OPENAI_API_KEY</code> (DALL-E).
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-white mb-2">Language</label>
-                  <select
-                    value={language}
-                    onChange={(e) => setLanguage(e.target.value)}
-                    className="w-full min-w-[200px] px-4 py-3 pr-10 bg-[#2C2C2E] border border-[#2C2C2E] rounded-xl text-white focus:outline-none focus:border-[#6B48FF] text-base"
-                  >
-                    {LANGUAGES.map((l) => (
-                      <option key={l.value} value={l.value}>{l.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-white mb-2">Voice</label>
-                  <select
-                    value={voice}
-                    onChange={(e) => setVoice(e.target.value)}
-                    className="w-full min-w-[200px] px-4 py-3 pr-10 bg-[#2C2C2E] border border-[#2C2C2E] rounded-xl text-white focus:outline-none focus:border-[#6B48FF] text-base"
-                  >
-                    {VOICES.map((v) => (
-                      <option key={v.value} value={v.value}>{v.label}</option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-[#A0A0A0] mt-1">Voce usata per il TTS (OpenAI) nella Room.</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-white mb-2">Convai Character ID</label>
-                  <input
-                    type="text"
-                    value={convaiCharacterId}
-                    onChange={(e) => setConvaiCharacterId(e.target.value)}
-                    className="w-full min-w-0 px-4 py-3 bg-[#2C2C2E] border border-[#2C2C2E] rounded-xl text-white placeholder-[#A0A0A0] focus:outline-none focus:border-[#6B48FF] text-base"
-                    placeholder="ID personaggio Convai (per avatar parlante)"
-                  />
-                  <p className="text-xs text-[#A0A0A0] mt-1">Opzionale. Inserisci l&apos;ID del personaggio da Convai per avere l&apos;avatar parlante in Room.</p>
-                </div>
-                <div className="flex justify-end pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setStep(2)}
-                    className="px-8 py-3 bg-[#6B48FF] text-white rounded-xl font-medium hover:bg-[#5A3FE6] transition-colors"
-                  >
-                    Next
-                  </button>
+
+                {/* Colonna destra: Nome, Lingua, Voce */}
+                <div className="flex-1 min-w-0 space-y-5">
+                  <div className="rounded-2xl bg-slate-800/50 border border-violet-500/20 p-5 sm:p-6 space-y-5">
+                    <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <span className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center text-violet-400">1</span>
+                      Nome e voce
+                    </h2>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Nome del personaggio</label>
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full px-4 py-3 bg-slate-900/80 border border-violet-500/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-violet-500/50"
+                        placeholder="Es. Marco, Sofia..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Lingua</label>
+                      <select
+                        value={language}
+                        onChange={(e) => setLanguage(e.target.value)}
+                        className="w-full px-4 py-3 pr-10 bg-slate-900/80 border border-violet-500/20 rounded-xl text-white focus:outline-none focus:border-violet-500/50"
+                      >
+                        {LANGUAGES.map((l) => (
+                          <option key={l.value} value={l.value}>{l.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Voce (TTS in Room)</label>
+                      <select
+                        value={voice}
+                        onChange={(e) => setVoice(e.target.value)}
+                        className="w-full px-4 py-3 pr-10 bg-slate-900/80 border border-violet-500/20 rounded-xl text-white focus:outline-none focus:border-violet-500/50"
+                      >
+                        {VOICES.map((v) => (
+                          <option key={v.value} value={v.value}>{v.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setStep(2)}
+                        className={`px-6 py-3 rounded-xl font-semibold bg-gradient-to-r ${accent} text-white shadow-lg shadow-violet-500/25 hover:opacity-95 transition-opacity`}
+                      >
+                        Avanti — Conoscenze
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -478,18 +509,30 @@ function NewAvatarContent() {
 
           {/* Step 2 - Knowledge */}
           {step === 2 && (
-            <div className="max-w-2xl space-y-6">
-              <div className="bg-[#2C2C2E] rounded-2xl p-6">
-                <h2 className="text-lg font-semibold text-white mb-2">Description</h2>
+            <div className="max-w-3xl mx-auto space-y-6">
+              <div className="mb-6 sm:mb-8">
+                <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-violet-500/20 text-violet-300 border border-violet-500/30 mb-2">
+                  Livello 2 — Conoscenze
+                </span>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+                  {editId ? 'Modifica conoscenze' : 'Cosa sa il tuo personaggio'}
+                </h1>
+                <p className="text-slate-400 text-sm sm:text-base">Storia del personaggio e materiali di riferimento.</p>
+              </div>
+              <div className="bg-slate-800/60 rounded-2xl p-6 border border-violet-500/20 shadow-xl shadow-violet-500/5">
+                <h2 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center text-violet-400 text-sm">2</span>
+                  Descrizione / Storia del personaggio
+                </h2>
                 <div className="relative">
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value.slice(0, descriptionCharLimit))}
-                    placeholder="Describe what this avatar should know and focus on (e.g. Electronics for technical high schools, basic circuits, lab exercises)"
+                    placeholder="Descrivi cosa deve sapere e su cosa deve concentrarsi questo avatar (es. Elettronica per istituti tecnici, circuiti base, laboratori)"
                     rows={5}
-                    className="w-full px-4 py-3 bg-[#1A1A1A] border border-[#2C2C2E] rounded-xl text-white placeholder-[#A0A0A0] focus:outline-none focus:border-[#6B48FF] resize-none"
+                    className="w-full px-4 py-3 bg-slate-900/80 border border-violet-500/20 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-violet-500/50 resize-none"
                   />
-                  <span className="absolute top-2 right-2 text-xs text-[#A0A0A0]">
+                  <span className="absolute top-2 right-2 text-xs text-slate-400">
                     {description.length}/{descriptionCharLimit}
                   </span>
                 </div>
@@ -497,39 +540,42 @@ function NewAvatarContent() {
                   type="button"
                   onClick={handleGenerateDescription}
                   disabled={isGeneratingDescription}
-                  className="mt-3 px-4 py-2 bg-[#6B48FF] text-white rounded-xl text-sm font-medium hover:bg-[#5A3FE6] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className={`mt-3 px-4 py-2 bg-gradient-to-r ${accent} text-white rounded-xl text-sm font-medium hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity shadow-lg shadow-violet-500/20`}
                 >
                   {isGeneratingDescription ? 'Generazione in corso...' : (description.trim() ? 'Rigenera con AI' : 'Genera con AI')}
                 </button>
-                <p className="text-[10px] text-[#818CF8] mt-1">
-                  Usa GPT: imposta <code className="bg-[#2C2C2E] px-1 rounded">OPENAI_API_KEY</code> in .env.local o Netlify per la backstory.
+                <p className="text-[10px] text-violet-300 mt-1">
+                  Usa GPT: imposta <code className="bg-slate-800 px-1 rounded">OPENAI_API_KEY</code> in .env.local o Netlify per la backstory.
                 </p>
               </div>
 
-              <div className="bg-[#2C2C2E] rounded-2xl p-6">
-                <h2 className="text-lg font-semibold text-white mb-1">Knowledge bank</h2>
-                <p className="text-sm text-[#A0A0A0] mb-4">
-                  These materials are used as references when answering questions.
+              <div className="bg-slate-800/60 rounded-2xl p-6 border border-violet-500/20 shadow-xl shadow-violet-500/5">
+                <h2 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center text-violet-400 text-sm">3</span>
+                  Banca conoscenze
+                </h2>
+                <p className="text-sm text-slate-400 mb-4">
+                  Questi materiali vengono usati come riferimento quando l&apos;avatar risponde.
                 </p>
                 <button
                   type="button"
                   onClick={addKnowledgeFile}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#6B48FF] text-white rounded-xl font-medium hover:bg-[#5A3FE6] transition-colors"
+                  className={`flex items-center gap-2 px-4 py-2 bg-gradient-to-r ${accent} text-white rounded-xl font-medium hover:opacity-95 shadow-lg shadow-violet-500/20 transition-opacity`}
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  Add
+                  Aggiungi
                 </button>
                 {knowledgeFiles.length > 0 && (
                   <ul className="mt-4 space-y-2">
                     {knowledgeFiles.map((f) => (
                       <li
                         key={f.id}
-                        className="flex items-center justify-between px-4 py-3 bg-[#1A1A1A] rounded-xl"
+                        className="flex items-center justify-between px-4 py-3 bg-slate-900/80 rounded-xl border border-violet-500/10"
                       >
                         <div className="flex items-center gap-3">
-                          <svg className="w-5 h-5 text-[#A0A0A0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
                           <span className="text-white">{f.name}</span>
@@ -537,8 +583,8 @@ function NewAvatarContent() {
                         <button
                           type="button"
                           onClick={() => removeKnowledgeFile(f.id)}
-                          className="p-2 text-[#A0A0A0] hover:text-white hover:bg-[#333335] rounded-lg transition-colors"
-                          aria-label="Remove"
+                          className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                          aria-label="Rimuovi"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -550,15 +596,18 @@ function NewAvatarContent() {
                 )}
               </div>
 
-              <div className="bg-[#2C2C2E] rounded-2xl p-6">
-                <h2 className="text-lg font-semibold text-white mb-1">AI Model</h2>
-                <p className="text-sm text-[#A0A0A0] mb-4">
-                  Choose the AI model that best suits your scope
+              <div className="bg-slate-800/60 rounded-2xl p-6 border border-violet-500/20 shadow-xl shadow-violet-500/5">
+                <h2 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center text-violet-400 text-sm">4</span>
+                  Modello AI
+                </h2>
+                <p className="text-sm text-slate-400 mb-4">
+                  Scegli il modello AI più adatto allo scopo
                 </p>
                 <select
                   value={aiModel}
                   onChange={(e) => setAiModel(e.target.value)}
-                  className="w-full px-4 py-3 bg-[#1A1A1A] border border-[#2C2C2E] rounded-xl text-white focus:outline-none focus:border-[#6B48FF]"
+                  className="w-full px-4 py-3 bg-slate-900/80 border border-violet-500/20 rounded-xl text-white focus:outline-none focus:border-violet-500/50"
                 >
                   {AI_MODELS.map((m) => (
                     <option key={m.value} value={m.value}>{m.label}</option>
@@ -570,16 +619,16 @@ function NewAvatarContent() {
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="px-8 py-3 bg-[#2C2C2E] text-white rounded-xl font-medium hover:bg-[#333335] transition-colors"
+                  className="px-8 py-3 bg-slate-800/60 border border-violet-500/20 text-white rounded-xl font-medium hover:bg-slate-800 transition-colors"
                 >
-                  Back
+                  Indietro
                 </button>
                 <button
                   type="button"
                   onClick={() => setStep(3)}
-                  className="px-8 py-3 bg-[#6B48FF] text-white rounded-xl font-medium hover:bg-[#5A3FE6] transition-colors"
+                  className={`px-8 py-3 bg-gradient-to-r ${accent} text-white rounded-xl font-medium hover:opacity-95 shadow-lg shadow-violet-500/25 transition-opacity`}
                 >
-                  Next
+                  Avanti
                 </button>
               </div>
             </div>
@@ -587,14 +636,23 @@ function NewAvatarContent() {
 
           {/* Step 3 - Behaviour */}
           {step === 3 && (
-            <div className="max-w-4xl">
+            <div className="max-w-4xl mx-auto">
+              <div className="mb-6 sm:mb-8">
+                <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-violet-500/20 text-violet-300 border border-violet-500/30 mb-2">
+                  Livello 3 — Comportamento
+                </span>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+                  {editId ? 'Modifica comportamento' : 'Come si comporta il tuo personaggio'}
+                </h1>
+                <p className="text-slate-400 text-sm sm:text-base">Personalità e stile di risposta.</p>
+              </div>
               <div className="flex flex-col lg:flex-row gap-8">
                 <div className="flex-1 space-y-6">
                   {TRAITS.map(({ key, label, color }) => (
                     <div key={key}>
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-sm font-medium text-white">{label}</span>
-                        <span className="text-xs text-[#A0A0A0]">{personality[key]}%</span>
+                        <span className="text-xs text-slate-400">{personality[key]}%</span>
                       </div>
                       <input
                         type="range"
@@ -604,31 +662,31 @@ function NewAvatarContent() {
                         onChange={(e) => handleTraitChange(key, parseInt(e.target.value))}
                         className="w-full h-2 rounded-lg appearance-none cursor-pointer"
                         style={{
-                          background: `linear-gradient(to right, ${color} 0%, ${color} ${personality[key]}%, #2C2C2E ${personality[key]}%, #2C2C2E 100%)`,
+                          background: `linear-gradient(to right, ${color} 0%, ${color} ${personality[key]}%, rgb(51 65 85) ${personality[key]}%, rgb(51 65 85) 100%)`,
                         }}
                       />
                     </div>
                   ))}
                 </div>
                 <div className="w-full lg:w-80 flex-shrink-0 flex items-center justify-center">
-                  <div className="w-full h-64 bg-[#2C2C2E] rounded-2xl p-4">
+                  <div className="w-full h-64 bg-slate-800/60 rounded-2xl p-4 border border-violet-500/20">
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData}>
-                        <PolarGrid stroke="#444" />
+                        <PolarGrid stroke="rgb(100 116 139)" />
                         <PolarAngleAxis
                           dataKey="trait"
-                          tick={{ fill: '#e5e5e5', fontSize: 11 }}
+                          tick={{ fill: '#e2e8f0', fontSize: 11 }}
                         />
                         <PolarRadiusAxis
                           angle={90}
                           domain={[0, 100]}
-                          tick={{ fill: '#A0A0A0', fontSize: 10 }}
+                          tick={{ fill: '#94a3b8', fontSize: 10 }}
                         />
                         <Radar
-                          name="Behaviour"
+                          name="Comportamento"
                           dataKey="value"
-                          stroke="#6B48FF"
-                          fill="#6B48FF"
+                          stroke="rgb(139 92 246)"
+                          fill="rgb(139 92 246)"
                           fillOpacity={0.4}
                           strokeWidth={2}
                         />
@@ -638,16 +696,16 @@ function NewAvatarContent() {
                 </div>
               </div>
 
-              <div className="mt-10 flex items-center justify-between p-6 bg-[#2C2C2E] rounded-2xl">
+              <div className="mt-10 flex items-center justify-between p-6 bg-slate-800/60 rounded-2xl border border-violet-500/20">
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Random generator</h3>
-                  <p className="text-sm text-[#A0A0A0]">Generate a random personality</p>
+                  <h3 className="text-lg font-semibold text-white">Generatore casuale</h3>
+                  <p className="text-sm text-slate-400">Genera una personalità casuale</p>
                 </div>
                 <button
                   type="button"
                   onClick={handleRandomPersonality}
-                  className="w-14 h-14 rounded-full bg-[#6B48FF] text-white flex items-center justify-center hover:bg-[#5A3FE6] transition-colors text-2xl font-bold"
-                  aria-label="Random personality"
+                  className={`w-14 h-14 rounded-full bg-gradient-to-r ${accent} text-white flex items-center justify-center hover:opacity-95 shadow-lg shadow-violet-500/25 transition-opacity text-2xl font-bold`}
+                  aria-label="Personalità casuale"
                 >
                   ?
                 </button>
@@ -657,16 +715,16 @@ function NewAvatarContent() {
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="px-8 py-3 bg-[#2C2C2E] text-white rounded-xl font-medium hover:bg-[#333335] transition-colors"
+                  className="px-8 py-3 bg-slate-800/60 border border-violet-500/20 text-white rounded-xl font-medium hover:bg-slate-800 transition-colors"
                 >
-                  Back
+                  Indietro
                 </button>
                 <button
                   type="button"
                   onClick={handleCreateAvatar}
-                  className="px-8 py-3 bg-[#6B48FF] text-white rounded-xl font-medium hover:bg-[#5A3FE6] transition-colors"
+                  className={`px-8 py-3 bg-gradient-to-r ${accent} text-white rounded-xl font-medium hover:opacity-95 shadow-lg shadow-violet-500/25 transition-opacity`}
                 >
-                  {editId ? 'Salva modifiche' : 'Create avatar'}
+                  {editId ? 'Salva modifiche' : 'Crea avatar'}
                 </button>
               </div>
             </div>
@@ -680,8 +738,8 @@ function NewAvatarContent() {
 export default function NewAvatarPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#1A1A1A] flex items-center justify-center text-white">
-        <p className="text-[#A0A0A0]">Caricamento...</p>
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">
+        <p className="text-slate-400">Caricamento...</p>
       </div>
     }>
       <NewAvatarContent />

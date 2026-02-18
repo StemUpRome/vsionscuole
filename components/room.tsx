@@ -608,7 +608,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
     const navigate = (path: string | number) => {
       if (typeof path === 'number') {
         if (path === -1) router.back();
-        else router.push('/dashboard');
+        else router.push('/avatars');
       } else {
         router.push(path);
       }
@@ -660,6 +660,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   const [devices, setDevices] = useState<VideoDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatPosition, setChatPosition] = useState({ x: 16, y: 120 });
+  const [chatDrag, setChatDrag] = useState<{ active: boolean; startX: number; startY: number; startLeft: number; startTop: number } | null>(null);
   const [isCameraPaused, setIsCameraPaused] = useState(false);
   const [customBackgroundImage, setCustomBackgroundImage] = useState<string | null>(null);
   const [backgroundPrompt, setBackgroundPrompt] = useState('');
@@ -1516,8 +1519,9 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
     getDevices();
   }, []);
 
-  // Avvio Stream Video
+  // Avvio Stream Video (disabilitato in modalità avatar: niente camera, solo sfondo)
   useEffect(() => {
+    if (hasAvatarMode) return;
     if (!selectedDeviceId || isCameraPaused) return;
     const startStream = async () => {
         try {
@@ -1575,7 +1579,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
         }
     };
     startStream();
-  }, [selectedDeviceId, isCameraPaused]);
+  }, [hasAvatarMode, selectedDeviceId, isCameraPaused]);
 
   // ==========================================
   // 6. MOTORE AUDIO (Visualizer & TTS)
@@ -1993,19 +1997,23 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       setInputText("");
 
       try {
-          // In modalità avatar l'avatar deve sempre "vedere": usa sfondo caricato se c'è, altrimenti frame camera.
+          // In modalità avatar l'avatar NON vede lo sfondo: parla solo con voce/chat e racconta la storia (es. Dante).
+          // Lo sfondo è solo ambientazione visiva in room.
           let imageBase64: string | null = null;
-          const isObserveMessage = message.trim() === OSSERVA_MESSAGE;
           const lowerMsg = message.trim().toLowerCase();
           const isIdentityQuestion = /come ti chiami|chi sei|qual è il tuo nome|il tuo nome|what'?s your name|your name/i.test(lowerMsg) || lowerMsg === 'come ti chiami' || lowerMsg === 'chi sei';
+          const isObserveMessage = !hasAvatarMode && message.trim() === OSSERVA_MESSAGE;
 
-          // Per domande su nome/identità non inviare immagine: così il modello risponde solo con nome/identità e non parla di camera
-          if (hasAvatarMode && isIdentityQuestion) {
+          if (hasAvatarMode) {
+              // Avatar: nessuna immagine inviata (né sfondo né camera). Solo dialogo e contenuti/storia.
               imageBase64 = null;
-          } else if (customBackgroundImage && customBackgroundImage.startsWith('data:image/') && (isObserveMessage || hasAvatarMode)) {
-              imageBase64 = customBackgroundImage;
+          } else {
+              // Modalità non-avatar (Visual): usa sfondo custom se c'è, altrimenti frame camera
+              if (customBackgroundImage && customBackgroundImage.startsWith('data:image/') && isObserveMessage) {
+                  imageBase64 = customBackgroundImage;
+              }
           }
-          if (!imageBase64 && !isIdentityQuestion && (isObserveMessage || !hasAvatarMode || hasAvatarMode)) {
+          if (!imageBase64 && !hasAvatarMode) {
               if (!isCameraPaused && videoRef.current && videoRef.current.readyState >= 2) {
               const vid = videoRef.current;
               const videoWidth = vid.videoWidth || vid.clientWidth || 1920;
@@ -2416,6 +2424,30 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       }
   };
 
+  // Drag chat (riquadro flottante)
+  useEffect(() => {
+    if (!chatDrag?.active) return;
+    const onMove = (e: MouseEvent | TouchEvent) => {
+      const clientX = 'touches' in e ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX;
+      const clientY = 'touches' in e ? (e as TouchEvent).touches[0].clientY : (e as MouseEvent).clientY;
+      setChatPosition({
+        x: Math.max(0, chatDrag.startLeft + (clientX - chatDrag.startX)),
+        y: Math.max(0, chatDrag.startTop + (clientY - chatDrag.startY)),
+      });
+    };
+    const onUp = () => setChatDrag(null);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove, { passive: true });
+    window.addEventListener('touchend', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+    };
+  }, [chatDrag]);
+
   // Drag avatar (solo in modalità Avatar): clamp per non coprire dock/controlli
   const handleAvatarDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if (!hasAvatarMode) return;
@@ -2512,139 +2544,10 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
   // ==========================================
   return (
     <div className={`flex ${isMobile ? 'flex-col' : ''} h-screen bg-[#09090b] text-white font-sans overflow-hidden relative`}>
-      {/* Mobile Header */}
-      {isMobile && (
-        <div className="flex md:hidden items-center justify-between p-3 bg-[#18181b] border-b border-white/10 z-30">
-          <button
-            onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
-            className="w-10 h-10 flex items-center justify-center bg-white/10 rounded-lg"
-          >
-            ☰
-          </button>
-          <span className="text-sm font-bold">ZenkAI Room</span>
-          <button
-            onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
-            className="w-10 h-10 flex items-center justify-center bg-white/10 rounded-lg"
-          >
-            💬
-          </button>
-        </div>
-      )}
-      
-      {/* Mobile Overlay */}
-      {(leftSidebarOpen || rightSidebarOpen) && isMobile && (
-        <div
-          className="fixed inset-0 bg-black/80 z-40 md:hidden"
-          onClick={() => {
-            setLeftSidebarOpen(false);
-            setRightSidebarOpen(false);
-          }}
-        />
-      )}
-      
-      {/* === COL 1: SIDEBAR (Percorso Adattivo) - JARVIS Style === */}
-      <div className={`
-        jarvis-sidebar flex flex-col z-20 relative transition-all duration-300
-        ${isMobile 
-          ? `fixed left-0 top-0 h-full transform transition-transform duration-300 ${
-              leftSidebarOpen ? 'translate-x-0 w-[280px]' : '-translate-x-full w-[280px]'
-            }`
-          : `${sidebarCollapsed ? 'w-[60px]' : 'w-[300px]'}`
-        }
-      `}>
-         <div className={`jarvis-sidebar-header ${isMobile ? 'p-4' : 'p-6'} flex items-center justify-between`}>
-             {(!sidebarCollapsed || isMobile) ? (
-                 <>
-                     <div className="relative">
-                         <h1 className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold bg-gradient-to-r from-[#6366F1] to-[#818CF8] bg-clip-text text-transparent jarvis-icon-glow`}>
-                             ZenkAI
-                         </h1>
-                         <p className="text-xs text-gray-400 mt-1 font-semibold tracking-wide">Universal Tutor</p>
-                         <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-[#6366F1] rounded-full animate-pulse"></div>
-                     </div>
-                 </>
-             ) : (
-                 <div className="text-2xl bg-gradient-to-r from-[#6366F1] to-[#818CF8] bg-clip-text text-transparent jarvis-icon-glow font-bold">V</div>
-             )}
-             {!isMobile && (
-               <button
-                   onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                   className="jarvis-button w-8 h-8 flex items-center justify-center rounded-lg jarvis-icon-glow"
-                   title={sidebarCollapsed ? "Espandi sidebar" : "Collassa sidebar"}
-               >
-                   {sidebarCollapsed ? '▶' : '◀'}
-               </button>
-             )}
-             {isMobile && (
-               <button
-                   onClick={() => setLeftSidebarOpen(false)}
-                   className="jarvis-button w-8 h-8 flex items-center justify-center rounded-lg jarvis-icon-glow"
-               >
-                   ✕
-               </button>
-             )}
-         </div>
-
-                 {/* LISTA STEP (Dinamica dal Server) - JARVIS Style */}
-         {!sidebarCollapsed && (
-             <>
-                 <div className="flex-1 overflow-y-auto">
-                     <div className="p-6 space-y-3">
-                         {ui.sidebar?.steps?.map((step) => (
-                             <div key={step.id} className={`jarvis-step-item flex items-center gap-3 p-3 rounded-xl ${
-                                 step.status === 'current' ? 'current' : 
-                                 step.status === 'done' ? 'done' : ''
-                             }`}>
-                                 <div className={`jarvis-step-circle w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                                     step.status === 'done' ? 'bg-gradient-to-br from-green-500 to-green-600 text-white done' : 
-                                     step.status === 'current' ? 'border-2 border-[#6366F1] text-[#6366F1] bg-gradient-to-br from-[#6366F1]/20 to-[#4F46E5]/20 current' : 
-                                     'border border-gray-600/50 text-gray-500 bg-transparent'
-                                 }`}>
-                                     {step.status === 'done' ? '✓' : step.id}
-                                 </div>
-                                 <span className={`text-sm font-medium ${step.status === 'current' ? 'text-white' : step.status === 'done' ? 'text-gray-400' : 'text-gray-500'}`}>
-                                    {step.label}
-                                 </span>
-                             </div>
-                         ))}
-                     </div>
-
-                     {/* STRUMENTI DI SUPPORTO */}
-                     <SupportToolsSection
-                         onActivateTool={(toolType: ToolType, content: string) => {
-                             setUi(prev => ({
-                                 ...prev,
-                                 ar_overlay: {
-                                     ...prev.ar_overlay,
-                                     tool_active: toolType,
-                                     tool_content: content || prev.spoken_text || ''
-                                 }
-                             }));
-                         }}
-                         currentTool={ui.ar_overlay?.tool_active || 'none'}
-                         spokenText={ui.spoken_text}
-                         isExpanded={supportToolsExpanded}
-                         onToggleExpand={() => setSupportToolsExpanded(!supportToolsExpanded)}
-                     />
-                 </div>
-
-                 {/* OBIETTIVO - JARVIS Style */}
-                 <div className="jarvis-objective-box p-5">
-                     <div className="flex items-center gap-2 mb-2">
-                         <div className="w-1.5 h-1.5 bg-[#6366F1] rounded-full animate-pulse"></div>
-                         <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#6366F1]">Obiettivo</div>
-                     </div>
-                     <div className="text-sm font-semibold text-white leading-snug jarvis-icon-glow">{ui.sidebar?.card?.objective}</div>
-                 </div>
-             </>
-         )}
-      </div>
-
-
-      {/* === COL 2: CENTER (Video & AR) === */}
+      {/* === CENTER: area unica full screen (niente barre laterali) === */}
       <div ref={containerRef} className={`flex-1 relative bg-black flex items-center justify-center overflow-hidden min-h-0 ${isMobile ? 'w-full' : ''}`}>
-        {/* Video sempre montato quando non in pausa (per OSSERVA/motion); nascosto se c'è sfondo custom */}
-        {!isCameraPaused && (
+        {/* Video: solo in modalità Visual (non avatar); nascosto se c'è sfondo custom */}
+        {!hasAvatarMode && !isCameraPaused && (
           <video
             ref={videoRef}
             autoPlay
@@ -2673,12 +2576,21 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
             style={{ transform: 'translateZ(0)', imageRendering: 'auto' }}
           />
         )}
-        {isCameraPaused && !customBackgroundImage && (
+        {!customBackgroundImage && (hasAvatarMode || isCameraPaused) && (
           <div
             className={`text-gray-500 flex flex-col items-center justify-center gap-4 ${hasAvatarMode ? 'absolute inset-0 z-0 bg-[#18181b]' : 'absolute inset-0'}`}
           >
-            <span className="text-6xl">⏸️</span>
-            {!hasAvatarMode && <span>Camera Pausa</span>}
+            {hasAvatarMode ? (
+              <>
+                <span className="text-6xl">🖼️</span>
+                <span className="text-sm text-center px-4">Opzionale: aggiungi uno sfondo come ambientazione con la rotella ⚙️</span>
+              </>
+            ) : (
+              <>
+                <span className="text-6xl">⏸️</span>
+                <span>Camera Pausa</span>
+              </>
+            )}
           </div>
         )}
 
@@ -2819,7 +2731,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
          {/* TOP TOOLS - JARVIS Style */}
          <div className={`absolute ${isMobile ? 'top-2 left-2' : 'top-6 left-6'} flex gap-3 z-50 flex-wrap`}>
              <button 
-                 onClick={()=>navigate('/dashboard')} 
+                 onClick={()=>navigate('/avatars')} 
                  className="jarvis-button px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg text-[10px] sm:text-xs font-bold uppercase tracking-wider text-gray-300 hover:text-white"
              >
                  <span className="flex items-center gap-2">
@@ -2828,10 +2740,11 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                  </span>
              </button>
              <button 
-                 onClick={()=>setIsCameraPaused(!isCameraPaused)} 
-                 className="jarvis-button w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-lg text-lg sm:text-xl jarvis-icon-glow"
+                 onClick={()=>setIsChatOpen(!isChatOpen)} 
+                 className={`jarvis-button w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-lg text-lg sm:text-xl jarvis-icon-glow ${isChatOpen ? 'bg-[#6366F1]/30 border-[#6366F1]/60' : ''}`}
+                 title="Chat: scrivi quando non puoi usare il microfono"
              >
-                 {isCameraPaused ? '▶' : '⏸'}
+                 💬
              </button>
              <button 
                  onClick={()=>setIsSettingsOpen(true)} 
@@ -2840,6 +2753,67 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                  ⚙️
              </button>
          </div>
+
+         {/* CHAT: riquadro piccolo flottante e trascinabile */}
+         {isChatOpen && (
+           <div
+             className="absolute z-40 flex flex-col w-[280px] sm:w-[300px] rounded-xl bg-[#18181b]/95 backdrop-blur-md border border-[#6366F1]/30 shadow-2xl overflow-hidden"
+             style={{ left: chatPosition.x, top: chatPosition.y, height: 220 }}
+           >
+             <div
+               className="flex items-center justify-between px-3 py-2 border-b border-white/10 cursor-grab active:cursor-grabbing select-none"
+               onMouseDown={(e) => { e.preventDefault(); setChatDrag({ active: true, startX: e.clientX, startY: e.clientY, startLeft: chatPosition.x, startTop: chatPosition.y }); }}
+               onTouchStart={(e) => { const t = e.touches[0]; setChatDrag({ active: true, startX: t.clientX, startY: t.clientY, startLeft: chatPosition.x, startTop: chatPosition.y }); }}
+             >
+               <h3 className="font-bold text-white text-xs sm:text-sm flex items-center gap-1.5">
+                 <span className="w-1.5 h-1.5 bg-[#6366F1] rounded-full animate-pulse" />
+                 Conversazione
+               </h3>
+               <button onClick={(e)=>{ e.stopPropagation(); setIsChatOpen(false); }} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition" aria-label="Chiudi chat">
+                 ✕
+               </button>
+             </div>
+             <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-0 text-xs" style={{ height: 120 }}>
+               {history.length === 0 ? (
+                 <p className="text-gray-500 text-center py-2">Scrivi o usa il microfono per parlare con {hasAvatarMode && avatarDisplayData ? avatarDisplayData.name : 'il tutor'}.</p>
+               ) : (
+                 history.map((msg, i) => (
+                   <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                     <div className={`max-w-[92%] rounded-lg px-2.5 py-1.5 text-xs ${
+                       msg.sender === 'user' 
+                         ? 'bg-[#6366F1]/80 text-white' 
+                         : 'bg-white/10 text-gray-100 border border-[#6366F1]/20'
+                     }`}>
+                       {msg.sender === 'ai' && hasAvatarMode && avatarDisplayData && (
+                         <p className="text-[9px] text-[#818CF8] font-semibold mb-0.5">{avatarDisplayData.name}</p>
+                       )}
+                       <div className="whitespace-pre-wrap break-words leading-snug">{msg.text.trim()}</div>
+                     </div>
+                   </div>
+                 ))
+               )}
+               <div ref={chatEndRef} />
+             </div>
+             <form 
+               onSubmit={(e)=>{ e.preventDefault(); const t = inputText.trim(); if (t) { handleSendMessage(t); setInputText(''); } }} 
+               className="p-2 border-t border-white/10 flex gap-1.5"
+             >
+               <input 
+                 value={inputText} 
+                 onChange={(e)=>setInputText(e.target.value)} 
+                 placeholder="Scrivi..."
+                 className="flex-1 px-3 py-2 bg-[#09090b] border border-[#6366F1]/40 rounded-lg text-white placeholder-gray-500 text-xs focus:outline-none focus:border-[#6366F1]/70"
+               />
+               <button 
+                 type="submit" 
+                 disabled={!inputText.trim()} 
+                 className="px-3 py-2 rounded-lg bg-[#6366F1] hover:bg-[#5A3FE6] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-xs transition"
+               >
+                 Invia
+               </button>
+             </form>
+           </div>
+         )}
 
          {/* Toolbar Fluttuante - solo in modalità Visual */}
          {!hasAvatarMode && (
@@ -3127,31 +3101,10 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                  </div>
              )}
              
-             {/* Pulsante OSSERVA: stessa pipeline della chat (handleSendMessage con messaggio fisso); defer per evitare interferenze dal click */}
-             <button
-                 type="button"
-                 onClick={(e) => {
-                   e.preventDefault();
-                   e.stopPropagation();
-                   const msg = OSSERVA_MESSAGE;
-                   setTimeout(() => handleSendMessage(msg), 0);
-                 }}
-                 className={`jarvis-primary ${isMobile ? 'h-14 flex-1 px-4' : 'h-20 px-8'} rounded-2xl text-white font-bold flex items-center justify-center gap-3 text-sm sm:text-base relative overflow-hidden group`}
-             >
-                 <span className="relative z-10 flex items-center gap-3">
-                     <svg className={`${isMobile ? 'w-5 h-5' : 'w-7 h-7'} jarvis-icon-glow`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                     </svg>
-                     <span className={isMobile ? 'text-xs font-semibold tracking-wide' : 'text-base font-bold tracking-wide'}>OSSERVA</span>
-                 </span>
-                 {/* Effetto shine al hover */}
-                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
-             </button>
          </div>
          
-         {/* LOADING - JARVIS Style */}
-         {isAnalyzing && (
+         {/* Loading overlay: solo in modalità Visual (camera/analisi). In avatar: chat semplice, niente "Analisi" o "Osserva". */}
+         {isAnalyzing && !hasAvatarMode && (
              <div className="absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-40">
                  <div className="jarvis-button px-10 py-8 rounded-3xl border border-[#6366F1]/50 flex flex-col items-center gap-4 shadow-[0_0_50px_rgba(99,102,241,0.5)] relative overflow-hidden">
                      <div className="jarvis-icon-glow">
@@ -3160,7 +3113,7 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                          </svg>
                      </div>
-                     <span className="font-bold text-[#6366F1] uppercase tracking-[0.3em] text-sm jarvis-icon-glow">Analisi in corso</span>
+                     <span className="font-bold text-[#6366F1] uppercase tracking-[0.3em] text-sm jarvis-icon-glow">Elaborazione...</span>
                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#6366F1] to-transparent animate-pulse"></div>
                  </div>
              </div>
@@ -3168,175 +3121,15 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
       </div>
 
 
-      {/* === COL 3: CHAT - JARVIS Style === */}
-      <div className={`
-        jarvis-sidebar flex flex-col z-20 transition-all duration-300
-        ${isMobile
-          ? `fixed right-0 top-0 h-full transform transition-transform duration-300 ${
-              rightSidebarOpen ? 'translate-x-0 w-[90vw] max-w-[350px]' : 'translate-x-full w-[90vw] max-w-[350px]'
-            }`
-          : `${sidebarCollapsed ? 'w-[60px]' : 'w-[350px]'}`
-        }
-      `}>
-         <div className={`jarvis-sidebar-header ${isMobile ? 'p-4' : 'p-6'} flex items-center justify-between`}>
-             {(!sidebarCollapsed || isMobile) ? (
-                 <div className="relative flex items-center gap-2">
-                     <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-[#6366F1] rounded-full animate-pulse"></div>
-                     <h2 className={`font-bold bg-gradient-to-r from-[#6366F1] to-[#818CF8] bg-clip-text text-transparent ${isMobile ? 'text-base' : 'text-lg'} jarvis-icon-glow`}>
-                       {hasAvatarMode && avatarDisplayData ? avatarDisplayData.name : 'D.A.I'}
-                     </h2>
-                 </div>
-             ) : (
-                 <div className="text-2xl bg-gradient-to-r from-[#6366F1] to-[#818CF8] bg-clip-text text-transparent jarvis-icon-glow">💬</div>
-             )}
-             {!isMobile && (
-               <button
-                   onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                   className="jarvis-button w-8 h-8 flex items-center justify-center rounded-lg jarvis-icon-glow"
-                   title={sidebarCollapsed ? "Espandi chat" : "Collassa chat"}
-               >
-                   {sidebarCollapsed ? '◀' : '▶'}
-               </button>
-             )}
-             {isMobile && (
-               <button
-                   onClick={() => setRightSidebarOpen(false)}
-                   className="jarvis-button w-8 h-8 flex items-center justify-center rounded-lg jarvis-icon-glow"
-               >
-                   ✕
-               </button>
-             )}
-         </div>
-         
-         {(!sidebarCollapsed || isMobile) && (
-             <>
-         <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-[#09090b] via-[#121212] to-[#09090b]">
-             {history.map((msg, i) => {
-                // Parse pulsanti nella risposta AI (formato: [visualizza la frazione])
-                const buttonRegex = /\[([^\]]+)\]/g;
-                let text = msg.text;
-                const buttons: Array<{ text: string; action: string }> = [];
-                let match;
-                
-                while ((match = buttonRegex.exec(msg.text)) !== null) {
-                    buttons.push({ text: match[1], action: match[1].toLowerCase() });
-                    text = text.replace(match[0], '');
-                }
-                
-                return (
-                    <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
-                        <div className={`max-w-[90%] ${msg.sender === 'user' ? '' : 'w-full'} relative`}>
-                            {msg.sender === 'ai' && hasAvatarMode && avatarDisplayData && (
-                              <p className="text-[10px] font-semibold text-[#818CF8] mb-1 pl-1">{avatarDisplayData.name}</p>
-                            )}
-                            {/* JARVIS Style Chat Bubble */}
-                            <div className={`p-4 rounded-xl text-sm leading-relaxed relative ${
-                                msg.sender === 'user' 
-                                ? 'jarvis-chat-user text-white' 
-                                : 'jarvis-chat-ai text-gray-100'
-                            }`}>
-                                <div className="relative z-10 whitespace-pre-wrap">{text.trim()}</div>
-                            </div>
-                            {/* Pulsanti azione (solo per messaggi AI) */}
-                            {msg.sender === 'ai' && buttons.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                    {buttons.map((btn, btnIdx) => {
-                                        const getToolType = (action: string): ToolType | null => {
-                                            const lower = action.toLowerCase();
-                                            if (lower.includes('frazione') || lower.includes('fraction')) return 'fraction_visual';
-                                            if (lower.includes('numero') || lower.includes('number') || lower.includes('linea')) return 'number_line';
-                                            if (lower.includes('grammatica') || lower.includes('analisi')) return 'grammar_analyzer';
-                                            if (lower.includes('flashcard') || lower.includes('vocabolario')) return 'flashcard_viewer';
-                                            if (lower.includes('mappa') || lower.includes('concettuale')) return 'concept_map';
-                                            return null;
-                                        };
-                                        
-                                        const toolType = getToolType(btn.action);
-                                        
-                                        return (
-                                            <button
-                                                key={btnIdx}
-                                                onClick={() => {
-                                                    if (toolType) {
-                                                        // Attiva il tool con il contenuto della chat attuale
-                                                        setUi(prev => ({
-                                                            ...prev,
-                                                            ar_overlay: {
-                                                                ...prev.ar_overlay,
-                                                                tool_active: toolType,
-                                                                tool_content: prev.spoken_text || text
-                                                            }
-                                                        }));
-                                                    }
-                                                }}
-                                                className="jarvis-button px-4 py-2.5 rounded-lg text-[#818CF8] text-xs font-bold transition-all hover:scale-105 border border-[#6366F1]/30 hover:border-[#6366F1]/60"
-                                            >
-                                                {btn.text}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                );
-             })}
-             <div ref={chatEndRef} />
-         </div>
-
-         <div className={`jarvis-objective-box ${isMobile ? 'p-3' : 'p-4'}`}>
-             <div className={`${isMobile ? 'mb-3' : 'mb-4'}`}>
-                 <div className="flex items-center gap-2 mb-2">
-                     <div className="w-1.5 h-1.5 bg-[#6366F1] rounded-full animate-pulse"></div>
-                     <span className={`text-[#818CF8] ${isMobile ? 'text-[9px]' : 'text-[10px]'} font-bold uppercase tracking-[0.2em]`}>Domanda Guida</span>
-                 </div>
-                 <p className={`text-white font-semibold ${isMobile ? 'text-sm' : 'text-md'} leading-tight jarvis-icon-glow`}>{ui.sidebar?.card?.question}</p>
-             </div>
-
-             <form onSubmit={(e)=>{e.preventDefault(); handleSendMessage(inputText)}} className="flex gap-2">
-                 <input 
-                    value={inputText} 
-                    onChange={(e)=>setInputText(e.target.value)} 
-                    placeholder="Rispondi..." 
-                    className={`jarvis-input flex-1 bg-[#09090b] text-white border-[#6366F1]/50 ${isMobile ? 'rounded-lg px-3 py-2 text-xs' : 'rounded-xl px-4 py-3 text-sm'} outline-none`}
-                    style={{ 
-                      backgroundColor: 'rgba(9, 9, 11, 0.98)',
-                      background: 'rgba(9, 9, 11, 0.98)',
-                      color: '#ffffff',
-                      borderColor: 'rgba(99, 102, 241, 0.5)'
-                    }}
-                 />
-                 <button type="submit" className={`jarvis-primary ${isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-3'} ${isMobile ? 'rounded-lg' : 'rounded-xl'} font-bold`}>↑</button>
-             </form>
-             
-             {ui.sidebar?.card?.hints?.length > 0 && (
-                 <div className="mt-3 flex gap-2 justify-center">
-                     {ui.sidebar.card.hints.map((h, i) => (
-                         <button 
-                            key={i} 
-                            onClick={()=>{setActiveHint(i); alert(h)}} 
-                            className={`w-2 h-2 rounded-full transition-all ${activeHint === i ? 'bg-yellow-400 scale-125' : 'bg-gray-600 hover:bg-gray-500'}`} 
-                            title="Mostra Suggerimento" 
-                         />
-                     ))}
-                     <span className="text-[10px] text-gray-500 ml-2 uppercase tracking-wider self-center">Aiuti</span>
-                 </div>
-             )}
-         </div>
-         </>
-         )}
-      </div>
-
       {/* MODAL SETTINGS */}
       {isSettingsOpen && (
         <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-6 backdrop-blur-sm overflow-y-auto">
             <div className="bg-[#1E1F20] p-6 rounded-2xl w-full max-w-sm border border-gray-700 shadow-2xl my-auto">
-                <h3 className="font-bold mb-4 text-white">Impostazioni</h3>
+                <h3 className="font-bold mb-4 text-white">Sfondo</h3>
 
-                {/* Sfondo Room: PRIMO BLOCCO in evidenza */}
                 <div className="mb-6 pb-6 border-b border-gray-700 rounded-xl bg-[#6366F1]/10 border border-[#6366F1]/30 p-4 -mx-1">
-                    <div className="text-sm font-bold text-[#818CF8] mb-1">🖼️ Sfondo Room</div>
-                    <p className="text-xs text-gray-400 mb-3">L&apos;avatar vedrà questa immagine al posto della camera.</p>
+                    <div className="text-sm font-bold text-[#818CF8] mb-1">🖼️ Sfondo come ambientazione</div>
+                    <p className="text-xs text-gray-400 mb-3">L&apos;avatar non vede l&apos;immagine: parla con voce e chat e racconta la storia (es. Dante). Lo sfondo serve solo per l&apos;atmosfera in room.</p>
                     <label className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#6366F1] hover:bg-[#5A3FE6] text-white cursor-pointer transition-colors text-sm font-semibold border-2 border-[#6366F1] mb-3">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                         Carica immagine sfondo
@@ -3378,89 +3171,11 @@ const ArToolRegistry = ({ type, content, sidebarCollapsed }: { type: any; conten
                             onClick={() => setCustomBackgroundImage(null)}
                             className="mt-2 w-full py-2 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-gray-300 text-sm font-medium transition"
                         >
-                            Rimuovi sfondo (usa camera)
+                            Rimuovi sfondo
                         </button>
                     )}
                 </div>
 
-                {/* Oggetto 3D (OBJ/GLB): visibile in Impostazioni sempre; in room solo in modalità avatar */}
-                <div className="mb-6 pb-6 border-b border-gray-700 rounded-xl bg-[#6366F1]/10 border border-[#6366F1]/30 p-4 -mx-1">
-                    <div className="text-sm font-bold text-[#818CF8] mb-1">📦 Oggetto 3D</div>
-                    <p className="text-xs text-gray-400 mb-3">Carica un modello OBJ o GLB: in modalità avatar apparirà nella room (trascinabile) e l&apos;avatar potrà vederlo.</p>
-                    <label className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#5A3FE6]/80 hover:bg-[#5A3FE6] text-white cursor-pointer transition-colors text-sm font-semibold border border-[#6366F1]/50">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8 4-8-4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-                        Carica OBJ / GLB
-                        <input
-                            type="file"
-                            accept=".obj,.glb,.gltf"
-                            className="hidden"
-                            onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                const name = file.name.toLowerCase();
-                                const type = name.endsWith('.obj') ? 'obj' : name.endsWith('.glb') ? 'glb' : name.endsWith('.gltf') ? 'gltf' : null;
-                                if (!type) return;
-                                if (prevObject3DUrlRef.current) URL.revokeObjectURL(prevObject3DUrlRef.current);
-                                const url = URL.createObjectURL(file);
-                                prevObject3DUrlRef.current = url;
-                                setCustomObject3DUrl(url);
-                                setCustomObject3DType(type);
-                                e.target.value = '';
-                            }}
-                        />
-                    </label>
-                    {customObject3DUrl && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (prevObject3DUrlRef.current) URL.revokeObjectURL(prevObject3DUrlRef.current);
-                                prevObject3DUrlRef.current = null;
-                                setCustomObject3DUrl(null);
-                                setCustomObject3DType(null);
-                            }}
-                            className="mt-2 w-full py-2 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-gray-300 text-sm font-medium transition"
-                        >
-                            Rimuovi oggetto 3D
-                        </button>
-                    )}
-                </div>
-                
-                {/* ROI Snap Toggle */}
-                <div className="mb-6 pb-6 border-b border-gray-700">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <div className="text-sm font-medium text-white mb-1">Snap ROI</div>
-                            <div className="text-xs text-gray-400">Allinea automaticamente ai bordi del foglio</div>
-                        </div>
-                        <button
-                            onClick={() => setRoiSnapEnabled(!roiSnapEnabled)}
-                            className={`w-12 h-6 rounded-full transition-colors ${
-                                roiSnapEnabled ? 'bg-[#6366F1]' : 'bg-gray-600'
-                            }`}
-                        >
-                            <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                                roiSnapEnabled ? 'translate-x-6' : 'translate-x-0.5'
-                            }`} />
-                        </button>
-                    </div>
-                </div>
-                
-                {/* Video Source */}
-                <div className="mb-4">
-                    <h4 className="text-sm font-medium text-white mb-2">Sorgente Video</h4>
-                    <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                        {devices.map(d=>(
-                            <button 
-                                key={d.deviceId} 
-                                onClick={()=>{setSelectedDeviceId(d.deviceId); setIsSettingsOpen(false)}} 
-                                className={`w-full text-left p-3 rounded-lg text-sm transition ${selectedDeviceId === d.deviceId ? 'bg-[#6366F1] text-white' : 'bg-white/5 hover:bg-white/10 text-gray-300'}`}
-                            >
-                                {d.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-                
                 <button onClick={()=>setIsSettingsOpen(false)} className="mt-6 w-full py-3 bg-white/10 hover:bg-white/20 text-gray-300 rounded-lg transition font-bold">CHIUDI</button>
             </div>
         </div>

@@ -5,15 +5,15 @@ import "./globals.css"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "ZenkAI",
-  description: "Piattaforma AI per scuole",
+  title: "VERSE WEB",
+  description: "Innovazione didattica con AR, VR e AI. Piattaforma educativa VERSE 2.0.",
 }
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
-  themeColor: "#1A1A1A",
+  themeColor: "#4f46e5",
 }
 
 export default function RootLayout({
