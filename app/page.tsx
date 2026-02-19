@@ -27,12 +27,48 @@ const BENEFICI = [
   { icon: '🥽', title: 'AR e VR', desc: 'Ambienti 3D immersivi.' },
 ]
 
-const AVATAR_IMAGES_FALLBACK = Array.from({ length: 16 }, (_, i) => `/avatar-${i + 1}.png`)
+// Lista statica per deploy: l'API in serverless spesso non può leggere public. Tutti gli avatar in public (escluso logo).
+const AVATAR_IMAGES_STATIC = [
+  '/avatar-1.png', '/avatar-2.png', '/avatar-3.png', '/avatar-4.png', '/avatar-6.png', '/avatar-7.png', '/avatar-8.png', '/avatar-9.png',
+  '/avatar-12.png', '/avatar-13.png', '/avatar-14.png', '/avatar-15.png', '/avatar-16.png',
+  '/ChatGPT_Image_9_feb_2026__06_45_50-removebg-preview.png',
+  '/ChatGPT_Image_9_feb_2026__06_47_04-removebg-preview.png',
+  '/ChatGPT_Image_9_feb_2026__06_48_25-removebg-preview.png',
+  '/ChatGPT_Image_9_feb_2026__06_52_15-removebg-preview.png',
+  '/ChatGPT_Image_9_feb_2026__07_06_23-removebg-preview.png',
+  '/ChatGPT_Image_9_feb_2026__07_08_08-removebg-preview.png',
+  '/Gemini_Generated_Image_36h07e36h07e36h0-removebg-preview.png',
+  '/Gemini_Generated_Image_3njulb3njulb3nju-removebg-preview.png',
+  '/Gemini_Generated_Image_3uc6cu3uc6cu3uc6-removebg-preview.png',
+  '/Gemini_Generated_Image_8b5bit8b5bit8b5b-removebg-preview.png',
+  '/Gemini_Generated_Image_a7lz64a7lz64a7lz-removebg-preview.png',
+  '/Gemini_Generated_Image_ahuu35ahuu35ahuu-removebg-preview.png',
+  '/Gemini_Generated_Image_an0825an0825an08-removebg-preview.png',
+  '/Gemini_Generated_Image_ba0q2eba0q2eba0q-removebg-preview.png',
+  '/Gemini_Generated_Image_ca0z2oca0z2oca0z-removebg-preview.png',
+  '/Gemini_Generated_Image_cusk1ccusk1ccusk-removebg-preview.png',
+  '/Gemini_Generated_Image_d1mbe8d1mbe8d1mb-removebg-preview.png',
+  '/Gemini_Generated_Image_d85gmrd85gmrd85g-removebg-preview.png',
+  '/Gemini_Generated_Image_dl6ds3dl6ds3dl6d-removebg-preview.png',
+  '/Gemini_Generated_Image_e16scje16scje16s-removebg-preview.png',
+  '/Gemini_Generated_Image_ha4rxha4rxha4rxh-removebg-preview.png',
+  '/Gemini_Generated_Image_m3pl97m3pl97m3pl-removebg-preview.png',
+  '/Gemini_Generated_Image_mihd90mihd90mihd-removebg-preview.png',
+  '/Gemini_Generated_Image_rizeqlrizeqlrize-removebg-preview.png',
+  '/Gemini_Generated_Image_smhomlsmhomlsmho-removebg-preview.png',
+  '/Gemini_Generated_Image_w3zteyw3zteyw3zt-removebg-preview.png',
+  '/Gemini_Generated_Image_w3zteyw3zteyw3zt-removebg-preview%20(1).png',
+  '/Gemini_Generated_Image_xqv6u8xqv6u8xqv6-removebg-preview.png',
+  '/Gemini_Generated_Image_yfaphfyfaphfyfap-removebg-preview.png',
+  '/Gemini_Generated_Image_z34romz34romz34r-removebg-preview.png',
+  '/Gemini_Generated_Image_z4dthez4dthez4dt-removebg-preview.png',
+  '/Gemini_Generated_Image_zzi9wzzi9wzzi9wz-removebg-preview.png',
+]
 
 export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [avatarImages, setAvatarImages] = useState<string[]>(AVATAR_IMAGES_FALLBACK)
+  const [avatarImages, setAvatarImages] = useState<string[]>(AVATAR_IMAGES_STATIC)
 
   useEffect(() => {
     let cancelled = false
@@ -180,15 +216,15 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Configura il tuo avatar — carousel avatar dalla cartella public */}
+        {/* Configura il tuo avatar — carousel con lista statica per deploy + effetti sulle card */}
         <div className="max-w-5xl mx-auto mt-16">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-2 text-white">Configura il tuo avatar</h2>
           <p className="text-center text-slate-400 text-sm mb-6">Scegli un volto, personalizza nome, voce e backstory. Poi usalo nella Room.</p>
           <div className="flex overflow-x-auto gap-4 pb-4 scrollbar-hide scroll-smooth snap-x snap-mandatory" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {avatarImages.map((src, index) => (
-              <div key={src} className="flex-shrink-0 w-32 sm:w-40 snap-center group">
-                <div className="relative rounded-xl overflow-hidden border-2 border-violet-500/30 aspect-[3/4] bg-slate-800 transition-all duration-300 group-hover:border-violet-400/60 group-hover:scale-105 group-hover:shadow-xl group-hover:shadow-violet-500/20">
-                  <Image src={src} alt={`Avatar ${index + 1}`} fill className="object-cover object-top" sizes="160px" />
+              <div key={`${src}-${index}`} className="flex-shrink-0 w-32 sm:w-40 snap-center group">
+                <div className="relative rounded-xl overflow-hidden border-2 border-violet-500/30 aspect-[3/4] bg-slate-800 transition-all duration-300 group-hover:border-violet-400 group-hover:scale-[1.08] group-hover:shadow-2xl group-hover:shadow-violet-500/30 group-hover:ring-2 group-hover:ring-violet-400/50">
+                  <Image src={src} alt={`Avatar ${index + 1}`} fill className="object-cover object-top transition-transform duration-300 group-hover:scale-105" sizes="160px" unoptimized />
                 </div>
               </div>
             ))}
